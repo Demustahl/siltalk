@@ -25,3 +25,22 @@ SilTalk — учебный мессенджер с упором на E2EE (end-t
 - WebSocket (realtime)
 - IndexedDB (локальное хранилище)
 - E2EE: libsignal (или другой подход на базе libsodium/WebCrypto — уточняется)
+
+## Backend Setup
+
+Зависимости backend теперь описаны в `backend/pyproject.toml`
+
+```bash
+cd backend
+uv sync
+uv run uvicorn siltalk_api.main:app --reload
+```
+
+Проверки:
+
+```bash
+cd backend
+uv run pytest
+uv run ruff check .
+uv run mypy src
+```
