@@ -10,7 +10,7 @@ def healthcheck() -> dict[str, str]:
 
 @app.websocket("/ws")
 async def websocket_echo(websocket: WebSocket) -> None:
-    # Принимаем соединение и отправляем клиенту тот же текст обратно.
+    # Принимаем соединение и отправляем клиенту тот же текст обратно
     await websocket.accept()
 
     try:
@@ -18,5 +18,5 @@ async def websocket_echo(websocket: WebSocket) -> None:
             message = await websocket.receive_text()
             await websocket.send_text(message)
     except WebSocketDisconnect:
-        # Клиент закрыл соединение. Для MVP здесь ничего больше не нужно.
+        # Клиент закрыл соединение
         pass
