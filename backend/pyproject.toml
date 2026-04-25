@@ -3,47 +3,35 @@ requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "siltalk-backend"
+name = "messenger-backend"
 version = "0.1.0"
-description = "Backend API for the SilTalk educational E2EE messenger"
+description = "Backend API for E2EE messenger"
 requires-python = ">=3.13"
 dependencies = [
-  "alembic>=1.16,<2.0",
-  "fastapi>=0.116,<0.117",
-  "pydantic-settings>=2.10,<3.0",
-  "psycopg[binary]>=3.2,<4.0",
-  "pyjwt>=2.10,<3.0",
-  "sqlalchemy>=2.0,<2.1",
-  "uvicorn[standard]>=0.35,<0.36",
+  "alembic",
+  "fastapi",
+  "psycopg[binary]",
+  "pyjwt",
+  "sqlalchemy",
+  "uvicorn[standard]",
 ]
 
 [dependency-groups]
 dev = [
-  "httpx>=0.28,<0.29",
-  "mypy>=1.15,<2.0",
-  "pytest>=8.3,<9.0",
-  "pytest-asyncio>=0.26,<0.27",
-  "ruff>=0.11,<0.12",
+  "httpx",
+  "mypy",
+  "pytest",
+  "ruff",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["siltalk_api*"]
+include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
-
-[tool.ruff.lint]
-select = ["B", "E", "F", "I", "UP"]
 
 [tool.mypy]
 python_version = "3.13"
-mypy_path = ["src"]
-warn_unused_configs = true

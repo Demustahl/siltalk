@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="SilTalk API", version="0.1.0")
+app = FastAPI(title="Messenger API", version="0.1.0")
 
 
 @app.get("/health", tags=["system"])

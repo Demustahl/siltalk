@@ -1,1 +1,0 @@
-"""SilTalk backend package."""

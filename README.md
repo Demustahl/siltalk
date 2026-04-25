@@ -1,7 +1,6 @@
 # SilTalk
 
-SilTalk — учебный мессенджер с упором на E2EE (end-to-end encryption).
-Цель проекта: бакалаврская работа + портфолио backend-разработчика на Python.
+SilTalk — мессенджер с E2EE (end-to-end encryption).
 
 Идея: сервер **не хранит открытый текст сообщений** — только в зашифрованном виде.
 Шифрование выполняется на клиенте.
@@ -33,7 +32,7 @@ SilTalk — учебный мессенджер с упором на E2EE (end-t
 ```bash
 cd backend
 uv sync
-uv run uvicorn siltalk_api.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 Проверки:
@@ -42,5 +41,5 @@ uv run uvicorn siltalk_api.main:app --reload
 cd backend
 uv run pytest
 uv run ruff check .
-uv run mypy src
+uv run mypy app
 ```

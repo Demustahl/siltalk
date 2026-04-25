@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from siltalk_api.main import app
+from app.main import app
 
 
 client = TestClient(app)
