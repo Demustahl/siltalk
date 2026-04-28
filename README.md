@@ -25,9 +25,15 @@ SilTalk — мессенджер с E2EE (end-to-end encryption).
 - IndexedDB (локальное хранилище)
 - E2EE: libsignal (или другой подход на базе libsodium/WebCrypto — уточняется)
 
-## Backend Setup
+## Структура
 
-Зависимости backend теперь описаны в `backend/pyproject.toml`
+- `backend/` — backend на Python и FastAPI
+- `frontend/` — будущий клиент
+- `infra/` — инфраструктурные файлы и локальный запуск
+
+## Локальный запуск backend
+
+Зависимости backend описаны в `backend/pyproject.toml`
 
 ```bash
 cd backend
@@ -35,38 +41,7 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Что уже есть в MVP backend:
-
-- `GET /health` -> `{"status": "ok"}`
-- `WebSocket /ws` -> сервер возвращает тот же текст обратно (`echo`)
-
-## Как проверить WebSocket вручную
-
-1. Запустить backend:
-
-```bash
-cd backend
-uv run uvicorn app.main:app --reload
-```
-
-2. Открыть в браузере любую страницу и перейти в DevTools -> Console.
-
-3. Выполнить такой код:
-
-```javascript
-const ws = new WebSocket("ws://127.0.0.1:8000/ws");
-
-ws.onmessage = (event) => console.log("Ответ сервера:", event.data);
-ws.onopen = () => ws.send("Привет");
-```
-
-4. В консоли должен появиться ответ:
-
-```text
-Ответ сервера: Привет
-```
-
-Проверки:
+## Проверки
 
 ```bash
 cd backend
