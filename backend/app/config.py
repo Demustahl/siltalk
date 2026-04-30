@@ -19,7 +19,7 @@ def load_env_file() -> None:
             continue
 
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+        os.environ[key.strip()] = value.strip().strip("\"'")
 
 
 load_env_file()
