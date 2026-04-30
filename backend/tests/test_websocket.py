@@ -1,17 +1,18 @@
 import asyncio
 import json
+import uuid
 from collections.abc import Generator
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth import create_access_token, hash_password
 from app.database import Base, get_db_session
 from app.main import app
-from app.models import User
+from app.models import DialogMember, Message, User
 from app.realtime import manager
 
 
@@ -48,8 +49,8 @@ class WebSocketTestApp:
         finally:
             db_session.close()
 
-    # Создает пользователя в тестовой БД и возвращает token
-    def create_token(self, username: str) -> str:
+    # Создает пользователя в тестовой БД
+    def create_user(self, username: str) -> User:
         with self.session_local() as db_session:
             user = User(
                 username=username,
@@ -57,8 +58,29 @@ class WebSocketTestApp:
             )
             db_session.add(user)
             db_session.commit()
+            db_session.refresh(user)
 
-            return create_access_token(user)
+            return user
+
+    # Создает пользователя и возвращает token
+    def create_token(self, username: str) -> str:
+        user = self.create_user(username)
+        return create_access_token(user)
+
+    # Возвращает сохраненные сообщения
+    def get_messages(self) -> list[Message]:
+        with self.session_local() as db_session:
+            return list(db_session.scalars(select(Message)).all())
+
+    # Возвращает usernames участников диалога
+    def get_dialog_member_usernames(self, dialog_id: uuid.UUID) -> set[str]:
+        with self.session_local() as db_session:
+            statement = (
+                select(User.username)
+                .join(DialogMember, DialogMember.user_id == User.id)
+                .where(DialogMember.dialog_id == dialog_id)
+            )
+            return set(db_session.scalars(statement).all())
 
 
 class WebSocketSession:
@@ -156,6 +178,27 @@ def test_websocket_sends_message_to_other_client() -> None:
                     "text": "hello",
                 }
 
+                await user1.send_json(
+                    {"type": "message", "to": "user2", "text": "second"}
+                )
+
+                assert await user2.receive_json() == {
+                    "type": "message",
+                    "from": "user1",
+                    "text": "second",
+                }
+
+            saved_messages = test_app.get_messages()
+            assert len(saved_messages) == 2
+            assert {message.ciphertext for message in saved_messages} == {
+                "hello",
+                "second",
+            }
+            assert len({message.dialog_id for message in saved_messages}) == 1
+            assert test_app.get_dialog_member_usernames(
+                saved_messages[0].dialog_id
+            ) == {"user1", "user2"}
+
     asyncio.run(run_test())
 
 
@@ -179,6 +222,7 @@ def test_websocket_returns_error_when_receiver_is_offline() -> None:
     async def run_test() -> None:
         async with WebSocketTestApp() as test_app:
             user1_token = test_app.create_token("user1")
+            test_app.create_user("user2")
 
             async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
                 await websocket.send_json(
@@ -189,6 +233,30 @@ def test_websocket_returns_error_when_receiver_is_offline() -> None:
                     "type": "error",
                     "text": "Получатель не подключен",
                 }
+
+            saved_messages = test_app.get_messages()
+            assert len(saved_messages) == 1
+            assert saved_messages[0].ciphertext == "hello"
+
+    asyncio.run(run_test())
+
+
+def test_websocket_returns_error_when_receiver_does_not_exist() -> None:
+    async def run_test() -> None:
+        async with WebSocketTestApp() as test_app:
+            user1_token = test_app.create_token("user1")
+
+            async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
+                await websocket.send_json(
+                    {"type": "message", "to": "user2", "text": "hello"}
+                )
+
+                assert await websocket.receive_json() == {
+                    "type": "error",
+                    "text": "Получатель не найден",
+                }
+
+            assert test_app.get_messages() == []
 
     asyncio.run(run_test())
 

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_user_from_token
 from app.database import get_db_session
+from app.messages import save_direct_message
 
 router = APIRouter()
 
@@ -72,6 +73,18 @@ async def websocket_chat(
             if message is None:
                 await websocket.send_json(
                     {"type": "error", "text": "Некорректный JSON или формат сообщения"}
+                )
+                continue
+
+            saved_message = save_direct_message(
+                db_session,
+                user,
+                message["to"],
+                message["text"],
+            )
+            if saved_message is None:
+                await websocket.send_json(
+                    {"type": "error", "text": "Получатель не найден"}
                 )
                 continue
 
