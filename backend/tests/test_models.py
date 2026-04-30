@@ -29,6 +29,13 @@ def test_messages_store_ciphertext_without_plaintext() -> None:
     assert "text" not in columns
 
 
+def test_users_store_password_hash_without_plain_password() -> None:
+    columns = set(Base.metadata.tables["users"].columns.keys())
+
+    assert "password_hash" in columns
+    assert "password" not in columns
+
+
 def test_metadata_compiles_for_postgresql_without_connection() -> None:
     dialect = postgresql.dialect()
 

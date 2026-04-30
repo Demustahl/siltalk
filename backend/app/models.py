@@ -27,6 +27,7 @@ class User(Base):
         default=uuid.uuid4,
     )
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
