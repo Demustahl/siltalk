@@ -1,14 +1,12 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.auth import get_user_from_token
 from app.database import get_db_session
 from app.messages import save_direct_message
-
-router = APIRouter()
 
 
 class ConnectionManager:
@@ -40,7 +38,6 @@ manager = ConnectionManager()
 
 
 # Обрабатывает WebSocket-подключение пользователя с access-токеном
-@router.websocket("/ws")
 async def websocket_chat(
     websocket: WebSocket,
     db_session: Session = Depends(get_db_session),

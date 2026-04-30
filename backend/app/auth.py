@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -20,7 +20,6 @@ from app.database import get_db_session
 from app.models import User
 from app.schemas import TokenResponse, UserCreate, UserLogin, UserRead
 
-router = APIRouter(tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 DbSession = Annotated[Session, Depends(get_db_session)]
@@ -131,11 +130,6 @@ def get_current_user(token: BearerToken, db_session: DbSession) -> User:
 
 
 # Регистрирует нового пользователя
-@router.post(
-    "/auth/register",
-    response_model=UserRead,
-    status_code=status.HTTP_201_CREATED,
-)
 def register_user(user_data: UserCreate, db_session: DbSession) -> UserRead:
     username = normalize_username(user_data.username)
     existing_user = get_user_by_username(db_session, username)
@@ -166,7 +160,6 @@ def register_user(user_data: UserCreate, db_session: DbSession) -> UserRead:
 
 
 # Проверяет логин и пароль, потом выдает access-токен
-@router.post("/auth/login", response_model=TokenResponse)
 def login_user(user_data: UserLogin, db_session: DbSession) -> TokenResponse:
     user = get_user_by_username(db_session, user_data.username)
     if user is None or not verify_password(user_data.password, user.password_hash):
@@ -180,7 +173,6 @@ def login_user(user_data: UserLogin, db_session: DbSession) -> TokenResponse:
 
 
 # Возвращает пользователя из текущего токена
-@router.get("/me", response_model=UserRead)
 def read_current_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> UserRead:

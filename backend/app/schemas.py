@@ -25,3 +25,20 @@ class UserRead(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class DialogRead(BaseModel):
+    id: uuid.UUID
+    dialog_type: str
+    title: str | None
+    members: list[str]
+    created_at: datetime
+
+
+class MessageRead(BaseModel):
+    id: uuid.UUID
+    dialog_id: uuid.UUID
+    sender_user_id: uuid.UUID
+    sender_username: str
+    ciphertext: str
+    created_at: datetime
