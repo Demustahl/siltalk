@@ -3,7 +3,8 @@ import json
 from typing import Any
 from urllib.parse import urlsplit
 
-from app.main import app, manager
+from app.main import app
+from app.realtime import manager
 
 
 class WebSocketSession:

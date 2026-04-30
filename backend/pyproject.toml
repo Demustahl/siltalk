@@ -29,6 +29,7 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-s"
 
 [tool.ruff]
 line-length = 88
