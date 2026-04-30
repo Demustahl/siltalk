@@ -97,14 +97,8 @@ def create_access_token(user: User) -> str:
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
-# Достает текущего пользователя из JWT-токена
-def get_current_user(token: BearerToken, db_session: DbSession) -> User:
-    auth_error = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не удалось проверить токен",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
+# Ищет пользователя по JWT-токену
+def get_user_from_token(token: str, db_session: Session) -> User | None:
     try:
         payload: dict[str, Any] = jwt.decode(
             token,
@@ -113,12 +107,23 @@ def get_current_user(token: BearerToken, db_session: DbSession) -> User:
         )
         user_id_raw = payload.get("sub")
         if not isinstance(user_id_raw, str):
-            raise auth_error
+            return None
         user_id = uuid.UUID(user_id_raw)
     except (jwt.PyJWTError, ValueError):
-        raise auth_error from None
+        return None
 
-    user = db_session.get(User, user_id)
+    return db_session.get(User, user_id)
+
+
+# Достает текущего пользователя из JWT-токена
+def get_current_user(token: BearerToken, db_session: DbSession) -> User:
+    auth_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Не удалось проверить токен",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    user = get_user_from_token(token, db_session)
     if user is None:
         raise auth_error
 

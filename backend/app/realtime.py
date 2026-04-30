@@ -1,7 +1,11 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
+
+from app.auth import get_user_from_token
+from app.database import get_db_session
 
 router = APIRouter()
 
@@ -34,15 +38,29 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+# Обрабатывает WebSocket-подключение пользователя с access-токеном
 @router.websocket("/ws")
-async def websocket_chat(websocket: WebSocket, client_id: str | None = None) -> None:
-    if client_id is None:
+async def websocket_chat(
+    websocket: WebSocket,
+    db_session: Session = Depends(get_db_session),
+    token: str | None = None,
+) -> None:
+    if token is None:
         await websocket.accept()
         await websocket.send_json(
-            {"type": "error", "text": "Нужно передать client_id в query params"}
+            {"type": "error", "text": "Нужно передать token в query params"}
         )
         await websocket.close()
         return
+
+    user = get_user_from_token(token, db_session)
+    if user is None:
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "text": "Некорректный token"})
+        await websocket.close()
+        return
+
+    client_id = user.username
 
     await manager.connect(client_id, websocket)
 
@@ -73,6 +91,7 @@ async def websocket_chat(websocket: WebSocket, client_id: str | None = None) -> 
         manager.disconnect(client_id, websocket)
 
 
+# Проверяет входящее сообщение из WebSocket
 def parse_message(raw_message: str) -> dict[str, str] | None:
     try:
         message: Any = json.loads(raw_message)

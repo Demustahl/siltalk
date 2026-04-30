@@ -1,10 +1,64 @@
 import asyncio
 import json
+from collections.abc import Generator
 from typing import Any
 from urllib.parse import urlsplit
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.auth import create_access_token, hash_password
+from app.database import Base, get_db_session
 from app.main import app
+from app.models import User
 from app.realtime import manager
+
+
+class WebSocketTestApp:
+    def __init__(self) -> None:
+        self.engine = create_engine(
+            "sqlite+pysqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        self.session_local = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self.engine,
+            class_=Session,
+            expire_on_commit=False,
+        )
+
+    async def __aenter__(self) -> "WebSocketTestApp":
+        Base.metadata.create_all(bind=self.engine)
+        app.dependency_overrides[get_db_session] = self.override_get_db_session
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=self.engine)
+        self.engine.dispose()
+
+    # Выдает тестовую сессию БД для WebSocket-ручки
+    def override_get_db_session(self) -> Generator[Session]:
+        db_session = self.session_local()
+        try:
+            yield db_session
+        finally:
+            db_session.close()
+
+    # Создает пользователя в тестовой БД и возвращает token
+    def create_token(self, username: str) -> str:
+        with self.session_local() as db_session:
+            user = User(
+                username=username,
+                password_hash=hash_password("secret-password"),
+            )
+            db_session.add(user)
+            db_session.commit()
+
+            return create_access_token(user)
 
 
 class WebSocketSession:
@@ -71,54 +125,93 @@ def setup_function() -> None:
     manager.active_connections.clear()
 
 
-def test_websocket_connects_with_client_id() -> None:
+def test_websocket_connects_with_token() -> None:
     async def run_test() -> None:
-        async with WebSocketSession("/ws?client_id=user1"):
-            pass
+        async with WebSocketTestApp() as test_app:
+            user1_token = test_app.create_token("user1")
+
+            async with WebSocketSession(f"/ws?token={user1_token}"):
+                pass
 
     asyncio.run(run_test())
 
 
 def test_websocket_sends_message_to_other_client() -> None:
     async def run_test() -> None:
-        async with (
-            WebSocketSession("/ws?client_id=user1") as user1,
-            WebSocketSession("/ws?client_id=user2") as user2,
-        ):
-            await user1.send_json({"type": "message", "to": "user2", "text": "hello"})
+        async with WebSocketTestApp() as test_app:
+            user1_token = test_app.create_token("user1")
+            user2_token = test_app.create_token("user2")
 
-            assert await user2.receive_json() == {
-                "type": "message",
-                "from": "user1",
-                "text": "hello",
-            }
+            async with (
+                WebSocketSession(f"/ws?token={user1_token}") as user1,
+                WebSocketSession(f"/ws?token={user2_token}") as user2,
+            ):
+                await user1.send_json(
+                    {"type": "message", "to": "user2", "text": "hello"}
+                )
+
+                assert await user2.receive_json() == {
+                    "type": "message",
+                    "from": "user1",
+                    "text": "hello",
+                }
 
     asyncio.run(run_test())
 
 
 def test_websocket_returns_error_for_bad_json() -> None:
     async def run_test() -> None:
-        async with WebSocketSession("/ws?client_id=user1") as websocket:
-            await websocket.send_text("not json")
+        async with WebSocketTestApp() as test_app:
+            user1_token = test_app.create_token("user1")
 
-            assert await websocket.receive_json() == {
-                "type": "error",
-                "text": "Некорректный JSON или формат сообщения",
-            }
+            async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
+                await websocket.send_text("not json")
+
+                assert await websocket.receive_json() == {
+                    "type": "error",
+                    "text": "Некорректный JSON или формат сообщения",
+                }
 
     asyncio.run(run_test())
 
 
 def test_websocket_returns_error_when_receiver_is_offline() -> None:
     async def run_test() -> None:
-        async with WebSocketSession("/ws?client_id=user1") as websocket:
-            await websocket.send_json(
-                {"type": "message", "to": "user2", "text": "hello"}
-            )
+        async with WebSocketTestApp() as test_app:
+            user1_token = test_app.create_token("user1")
 
+            async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
+                await websocket.send_json(
+                    {"type": "message", "to": "user2", "text": "hello"}
+                )
+
+                assert await websocket.receive_json() == {
+                    "type": "error",
+                    "text": "Получатель не подключен",
+                }
+
+    asyncio.run(run_test())
+
+
+def test_websocket_returns_error_without_token() -> None:
+    async def run_test() -> None:
+        async with WebSocketSession("/ws") as websocket:
             assert await websocket.receive_json() == {
                 "type": "error",
-                "text": "Получатель не подключен",
+                "text": "Нужно передать token в query params",
             }
+
+    asyncio.run(run_test())
+
+
+def test_websocket_returns_error_for_bad_token() -> None:
+    async def run_test() -> None:
+        async with WebSocketTestApp():
+            async with WebSocketSession("/ws?token=bad-token") as websocket:
+                assert await websocket.receive_json() == {
+                    "type": "error",
+                    "text": "Некорректный token",
+                }
+
 
     asyncio.run(run_test())
