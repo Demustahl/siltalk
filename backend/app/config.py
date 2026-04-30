@@ -1,9 +1,28 @@
 import os
+from pathlib import Path
 
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/siltalk"
 DEFAULT_JWT_SECRET_KEY = "local-dev-secret-key-for-messenger-backend"
 DEFAULT_ACCESS_TOKEN_EXPIRE_MINUTES = "60"
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+
+
+# Подгружает локальные настройки из backend/.env
+def load_env_file() -> None:
+    if not ENV_FILE.exists():
+        return
+
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
+load_env_file()
 
 
 # Берет адрес БД из окружения или использует локальный вариант
