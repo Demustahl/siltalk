@@ -2,8 +2,9 @@ from fastapi import FastAPI, status
 
 from app.auth import login_user, read_current_user, register_user
 from app.dialogs import read_dialog_messages, read_dialogs
+from app.keys import publish_my_public_key, read_user_public_key
 from app.realtime import websocket_chat
-from app.schemas import DialogRead, MessageRead, TokenResponse, UserRead
+from app.schemas import DialogRead, MessageRead, PublicKeyRead, TokenResponse, UserRead
 
 
 # Проверяет, что backend запущен
@@ -41,6 +42,20 @@ def register_routes(app: FastAPI) -> None:
         methods=["GET"],
         response_model=UserRead,
         tags=["auth"],
+    )
+    app.add_api_route(
+        "/me/keys",
+        publish_my_public_key,
+        methods=["PUT"],
+        response_model=PublicKeyRead,
+        tags=["keys"],
+    )
+    app.add_api_route(
+        "/users/{username}/keys",
+        read_user_public_key,
+        methods=["GET"],
+        response_model=PublicKeyRead,
+        tags=["keys"],
     )
 
     app.add_api_route(

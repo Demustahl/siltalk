@@ -93,8 +93,8 @@ def test_read_dialogs_returns_only_current_user_dialogs() -> None:
             test_app.create_user("user2")
             user3 = test_app.create_user("user3")
 
-            test_app.save_message(user1, "user2", "hello")
-            test_app.save_message(user3, "user2", "hidden")
+            test_app.save_message(user1, "user2", "ciphertext-hello")
+            test_app.save_message(user3, "user2", "ciphertext-hidden")
 
             response = await test_app.client.get(
                 "/dialogs",
@@ -116,8 +116,8 @@ def test_read_dialog_messages_returns_history_for_member() -> None:
             user1 = test_app.create_user("user1")
             user2 = test_app.create_user("user2")
 
-            first_message = test_app.save_message(user1, "user2", "hello")
-            test_app.save_message(user2, "user1", "answer")
+            first_message = test_app.save_message(user1, "user2", "ciphertext-hello")
+            test_app.save_message(user2, "user1", "ciphertext-answer")
 
             response = await test_app.client.get(
                 f"/dialogs/{first_message.dialog_id}/messages",
@@ -127,8 +127,8 @@ def test_read_dialog_messages_returns_history_for_member() -> None:
             assert response.status_code == 200
             response_data = response.json()
             assert [message["ciphertext"] for message in response_data] == [
-                "hello",
-                "answer",
+                "ciphertext-hello",
+                "ciphertext-answer",
             ]
             assert [message["sender_username"] for message in response_data] == [
                 "user1",
@@ -144,8 +144,8 @@ def test_read_dialog_messages_uses_limit() -> None:
             user1 = test_app.create_user("user1")
             test_app.create_user("user2")
 
-            first_message = test_app.save_message(user1, "user2", "first")
-            test_app.save_message(user1, "user2", "second")
+            first_message = test_app.save_message(user1, "user2", "ciphertext-first")
+            test_app.save_message(user1, "user2", "ciphertext-second")
 
             response = await test_app.client.get(
                 f"/dialogs/{first_message.dialog_id}/messages?limit=1",
@@ -154,7 +154,7 @@ def test_read_dialog_messages_uses_limit() -> None:
 
             assert response.status_code == 200
             assert len(response.json()) == 1
-            assert response.json()[0]["ciphertext"] == "first"
+            assert response.json()[0]["ciphertext"] == "ciphertext-first"
 
     asyncio.run(run_test())
 
@@ -166,7 +166,7 @@ def test_read_dialog_messages_returns_not_found_for_not_member() -> None:
             test_app.create_user("user2")
             user3 = test_app.create_user("user3")
 
-            message = test_app.save_message(user1, "user2", "hello")
+            message = test_app.save_message(user1, "user2", "ciphertext-hello")
 
             response = await test_app.client.get(
                 f"/dialogs/{message.dialog_id}/messages",

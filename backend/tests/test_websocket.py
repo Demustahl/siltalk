@@ -169,30 +169,38 @@ def test_websocket_sends_message_to_other_client() -> None:
                 WebSocketSession(f"/ws?token={user2_token}") as user2,
             ):
                 await user1.send_json(
-                    {"type": "message", "to": "user2", "text": "hello"}
+                    {
+                        "type": "message",
+                        "to": "user2",
+                        "ciphertext": "ciphertext-hello",
+                    }
                 )
 
                 assert await user2.receive_json() == {
                     "type": "message",
                     "from": "user1",
-                    "text": "hello",
+                    "ciphertext": "ciphertext-hello",
                 }
 
                 await user1.send_json(
-                    {"type": "message", "to": "user2", "text": "second"}
+                    {
+                        "type": "message",
+                        "to": "user2",
+                        "ciphertext": "ciphertext-second",
+                    }
                 )
 
                 assert await user2.receive_json() == {
                     "type": "message",
                     "from": "user1",
-                    "text": "second",
+                    "ciphertext": "ciphertext-second",
                 }
 
             saved_messages = test_app.get_messages()
             assert len(saved_messages) == 2
             assert {message.ciphertext for message in saved_messages} == {
-                "hello",
-                "second",
+                "ciphertext-hello",
+                "ciphertext-second",
             }
             assert len({message.dialog_id for message in saved_messages}) == 1
             assert test_app.get_dialog_member_usernames(
@@ -218,6 +226,27 @@ def test_websocket_returns_error_for_bad_json() -> None:
     asyncio.run(run_test())
 
 
+def test_websocket_rejects_message_without_ciphertext() -> None:
+    async def run_test() -> None:
+        async with WebSocketTestApp() as test_app:
+            user1_token = test_app.create_token("user1")
+            test_app.create_user("user2")
+
+            async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
+                await websocket.send_json(
+                    {"type": "message", "to": "user2", "text": "plain text"}
+                )
+
+                assert await websocket.receive_json() == {
+                    "type": "error",
+                    "text": "Некорректный JSON или формат сообщения",
+                }
+
+            assert test_app.get_messages() == []
+
+    asyncio.run(run_test())
+
+
 def test_websocket_returns_error_when_receiver_is_offline() -> None:
     async def run_test() -> None:
         async with WebSocketTestApp() as test_app:
@@ -226,7 +255,11 @@ def test_websocket_returns_error_when_receiver_is_offline() -> None:
 
             async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
                 await websocket.send_json(
-                    {"type": "message", "to": "user2", "text": "hello"}
+                    {
+                        "type": "message",
+                        "to": "user2",
+                        "ciphertext": "ciphertext-hello",
+                    }
                 )
 
                 assert await websocket.receive_json() == {
@@ -236,7 +269,7 @@ def test_websocket_returns_error_when_receiver_is_offline() -> None:
 
             saved_messages = test_app.get_messages()
             assert len(saved_messages) == 1
-            assert saved_messages[0].ciphertext == "hello"
+            assert saved_messages[0].ciphertext == "ciphertext-hello"
 
     asyncio.run(run_test())
 
@@ -248,7 +281,11 @@ def test_websocket_returns_error_when_receiver_does_not_exist() -> None:
 
             async with WebSocketSession(f"/ws?token={user1_token}") as websocket:
                 await websocket.send_json(
-                    {"type": "message", "to": "user2", "text": "hello"}
+                    {
+                        "type": "message",
+                        "to": "user2",
+                        "ciphertext": "ciphertext-hello",
+                    }
                 )
 
                 assert await websocket.receive_json() == {

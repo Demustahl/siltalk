@@ -27,6 +27,18 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class PublicKeyPublish(BaseModel):
+    public_key: str = Field(min_length=20, max_length=200)
+    device_name: str | None = Field(default="browser", max_length=120)
+
+
+class PublicKeyRead(BaseModel):
+    username: str
+    device_id: uuid.UUID
+    public_key: str
+    updated_at: datetime
+
+
 class DialogRead(BaseModel):
     id: uuid.UUID
     dialog_type: str

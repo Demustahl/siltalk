@@ -27,7 +27,11 @@ const state = {
   dialogs: [],
   activeDialogId: "",
   activeReceiver: "",
+  keyPair: null,
+  publicKey: "",
 };
+
+let sodium = null;
 
 apiUrlInput.value = state.apiUrl;
 
@@ -38,6 +42,146 @@ function setStatus(element, text, isError = false) {
 
 function authHeaders() {
   return { Authorization: `Bearer ${state.token}` };
+}
+
+async function ensureSodium() {
+  if (sodium) {
+    return sodium;
+  }
+
+  const sodiumModule = await import("https://cdn.skypack.dev/libsodium-wrappers-sumo");
+  sodium = sodiumModule.default || sodiumModule;
+  await sodium.ready;
+
+  return sodium;
+}
+
+function encodeBytes(bytes) {
+  return sodium.to_base64(bytes, sodium.base64_variants.ORIGINAL);
+}
+
+function decodeBytes(base64Text) {
+  return sodium.from_base64(base64Text, sodium.base64_variants.ORIGINAL);
+}
+
+function keyStorageName(username) {
+  return `e2ee-keypair:${username}`;
+}
+
+function readSavedKeyPair(username) {
+  const saved = localStorage.getItem(keyStorageName(username));
+  if (!saved) {
+    return null;
+  }
+
+  try {
+    const data = JSON.parse(saved);
+    if (!data.publicKey || !data.privateKey) {
+      return null;
+    }
+
+    return {
+      publicKey: decodeBytes(data.publicKey),
+      privateKey: decodeBytes(data.privateKey),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveKeyPair(username, keyPair) {
+  localStorage.setItem(
+    keyStorageName(username),
+    JSON.stringify({
+      publicKey: encodeBytes(keyPair.publicKey),
+      privateKey: encodeBytes(keyPair.privateKey),
+    }),
+  );
+}
+
+async function ensureLocalKeyPair() {
+  await ensureSodium();
+
+  let keyPair = readSavedKeyPair(state.me.username);
+  if (!keyPair) {
+    keyPair = sodium.crypto_box_keypair();
+    saveKeyPair(state.me.username, keyPair);
+  }
+
+  state.keyPair = keyPair;
+  state.publicKey = encodeBytes(keyPair.publicKey);
+}
+
+async function publishPublicKey() {
+  await request("/me/keys", {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      public_key: state.publicKey,
+      device_name: navigator.userAgent.slice(0, 120),
+    }),
+  });
+}
+
+async function ensureE2eeReady() {
+  setStatus(chatStatus, "Готовлю ключи");
+  await ensureLocalKeyPair();
+  await publishPublicKey();
+  setStatus(chatStatus, "");
+}
+
+async function loadPublicKey(username) {
+  return request(`/users/${encodeURIComponent(username)}/keys`, {
+    headers: authHeaders(),
+  });
+}
+
+function encryptForPublicKey(text, publicKey) {
+  const plaintext = sodium.from_string(text);
+  const publicKeyBytes = decodeBytes(publicKey);
+  const ciphertextBytes = sodium.crypto_box_seal(plaintext, publicKeyBytes);
+
+  return encodeBytes(ciphertextBytes);
+}
+
+async function encryptMessage(receiver, text) {
+  await ensureLocalKeyPair();
+
+  const receiverKey = await loadPublicKey(receiver);
+  const recipients = {
+    [receiver]: encryptForPublicKey(text, receiverKey.public_key),
+    [state.me.username]: encryptForPublicKey(text, state.publicKey),
+  };
+
+  return JSON.stringify({
+    version: 1,
+    algorithm: "libsodium.crypto_box_seal",
+    recipients,
+  });
+}
+
+function decryptMessage(ciphertext) {
+  if (!state.keyPair) {
+    return "Ключ для расшифровки не загружен";
+  }
+
+  try {
+    const envelope = JSON.parse(ciphertext);
+    const encryptedForMe = envelope.recipients?.[state.me.username];
+    if (!encryptedForMe) {
+      return "Сообщение зашифровано не для этого ключа";
+    }
+
+    const decryptedBytes = sodium.crypto_box_seal_open(
+      decodeBytes(encryptedForMe),
+      state.keyPair.publicKey,
+      state.keyPair.privateKey,
+    );
+
+    return sodium.to_string(decryptedBytes);
+  } catch {
+    return "Не удалось расшифровать сообщение";
+  }
 }
 
 function wsUrl() {
@@ -134,7 +278,7 @@ function renderMessages(messages) {
   for (const message of messages) {
     appendMessage({
       from: message.sender_username,
-      text: message.ciphertext,
+      text: decryptMessage(message.ciphertext),
     });
   }
 }
@@ -186,7 +330,10 @@ function openSocket() {
 
     if (data.type === "message") {
       if (data.from === state.activeReceiver) {
-        appendMessage(data);
+        appendMessage({
+          from: data.from,
+          text: decryptMessage(data.ciphertext),
+        });
       }
       await loadDialogs();
     }
@@ -209,6 +356,7 @@ async function showChat() {
   authView.hidden = true;
   chatView.hidden = false;
   await loadMe();
+  await ensureE2eeReady();
   await loadDialogs();
   openSocket();
 }
@@ -217,6 +365,8 @@ function showAuth() {
   closeSocket();
   state.token = "";
   state.me = null;
+  state.keyPair = null;
+  state.publicKey = "";
   localStorage.removeItem("accessToken");
   authView.hidden = false;
   chatView.hidden = true;
@@ -279,19 +429,26 @@ messageForm.addEventListener("submit", async (event) => {
   }
 
   state.activeReceiver = receiver;
-  state.socket.send(JSON.stringify({ type: "message", to: receiver, text }));
-  appendMessage({ from: state.me.username, text });
-  messageInput.value = "";
-  setStatus(chatStatus, "");
+  setStatus(chatStatus, "Шифрую сообщение");
 
-  setTimeout(async () => {
-    await loadDialogs();
-    const dialog = state.dialogs.find((item) => item.members.includes(receiver));
-    if (dialog) {
-      state.activeDialogId = dialog.id;
-      renderDialogs();
-    }
-  }, 250);
+  try {
+    const ciphertext = await encryptMessage(receiver, text);
+    state.socket.send(JSON.stringify({ type: "message", to: receiver, ciphertext }));
+    appendMessage({ from: state.me.username, text });
+    messageInput.value = "";
+    setStatus(chatStatus, "");
+
+    setTimeout(async () => {
+      await loadDialogs();
+      const dialog = state.dialogs.find((item) => item.members.includes(receiver));
+      if (dialog) {
+        state.activeDialogId = dialog.id;
+        renderDialogs();
+      }
+    }, 250);
+  } catch (error) {
+    setStatus(chatStatus, error.message, true);
+  }
 });
 
 if (state.token) {

@@ -92,20 +92,24 @@ def send_message_over_websocket(
     sender_token: str,
     receiver_token: str,
     receiver_username: str,
-    text: str,
+    ciphertext: str,
 ) -> None:
     with (
         client.websocket_connect(f"/ws?token={sender_token}") as sender_socket,
         client.websocket_connect(f"/ws?token={receiver_token}") as receiver_socket,
     ):
         sender_socket.send_json(
-            {"type": "message", "to": receiver_username, "text": text}
+            {
+                "type": "message",
+                "to": receiver_username,
+                "ciphertext": ciphertext,
+            }
         )
 
         assert receiver_socket.receive_json() == {
             "type": "message",
             "from": "maksim",
-            "text": text,
+            "ciphertext": ciphertext,
         }
 
 
@@ -131,12 +135,12 @@ def test_messenger_flow_register_login_send_and_read_history() -> None:
             maksim_token,
             dima_token,
             "dima",
-            "encrypted-hello",
+            "ciphertext-envelope",
         )
 
         saved_messages = test_app.get_saved_messages()
         assert len(saved_messages) == 1
-        assert saved_messages[0].ciphertext == "encrypted-hello"
+        assert saved_messages[0].ciphertext == "ciphertext-envelope"
 
         dialog_id = saved_messages[0].dialog_id
 
@@ -159,7 +163,7 @@ def test_messenger_flow_register_login_send_and_read_history() -> None:
         assert len(history) == 1
         assert history[0]["dialog_id"] == str(dialog_id)
         assert history[0]["sender_username"] == "maksim"
-        assert history[0]["ciphertext"] == "encrypted-hello"
+        assert history[0]["ciphertext"] == "ciphertext-envelope"
 
         stranger_response = client.get(
             f"/dialogs/{dialog_id}/messages",

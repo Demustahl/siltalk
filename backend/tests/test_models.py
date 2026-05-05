@@ -36,6 +36,14 @@ def test_users_store_password_hash_without_plain_password() -> None:
     assert "password" not in columns
 
 
+def test_device_keys_store_only_public_key_material() -> None:
+    columns = set(Base.metadata.tables["device_keys"].columns.keys())
+
+    assert "identity_key_public" in columns
+    assert "private_key" not in columns
+    assert "secret_key" not in columns
+
+
 def test_metadata_compiles_for_postgresql_without_connection() -> None:
     dialect = postgresql.dialect()
 

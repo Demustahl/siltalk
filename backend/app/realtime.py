@@ -77,7 +77,7 @@ async def websocket_chat(
                 db_session,
                 user,
                 message["to"],
-                message["text"],
+                message["ciphertext"],
             )
             if saved_message is None:
                 await websocket.send_json(
@@ -90,7 +90,7 @@ async def websocket_chat(
                 {
                     "type": "message",
                     "from": client_id,
-                    "text": message["text"],
+                    "ciphertext": message["ciphertext"],
                 },
             )
             if not is_sent:
@@ -113,13 +113,13 @@ def parse_message(raw_message: str) -> dict[str, str] | None:
 
     message_type = message.get("type")
     to_client = message.get("to")
-    text = message.get("text")
+    ciphertext = message.get("ciphertext")
 
     if message_type != "message":
         return None
     if not isinstance(to_client, str) or not to_client:
         return None
-    if not isinstance(text, str) or not text:
+    if not isinstance(ciphertext, str) or not ciphertext:
         return None
 
-    return {"type": message_type, "to": to_client, "text": text}
+    return {"type": message_type, "to": to_client, "ciphertext": ciphertext}
