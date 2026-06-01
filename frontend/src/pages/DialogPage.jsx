@@ -3,10 +3,39 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { decryptEnvelope } from "../lib/e2ee.js";
 import {
-  formatDateTime,
+  formatMessageDate,
+  formatMessageTime,
+  getDateKey,
   getDialogReceiver,
   messageStatusLabel,
 } from "../lib/format.js";
+
+const MESSAGE_GROUP_GAP_MS = 5 * 60 * 1000;
+
+function shouldShowDateDivider(message, previousMessage) {
+  if (!previousMessage) {
+    return true;
+  }
+
+  return getDateKey(message.created_at) !== getDateKey(previousMessage.created_at);
+}
+
+function shouldShowMessageFooter(message, nextMessage) {
+  if (!nextMessage) {
+    return true;
+  }
+  if (message.sender_username !== nextMessage.sender_username) {
+    return true;
+  }
+  if (getDateKey(message.created_at) !== getDateKey(nextMessage.created_at)) {
+    return true;
+  }
+
+  const messageTime = new Date(message.created_at).getTime();
+  const nextMessageTime = new Date(nextMessage.created_at).getTime();
+
+  return nextMessageTime - messageTime > MESSAGE_GROUP_GAP_MS;
+}
 
 export function DialogPage({
   api,
@@ -114,7 +143,7 @@ export function DialogPage({
 
       return hasChanges ? nextMessages : currentMessages;
     });
-  }, [deliveryStatus, dialogId, messages]);
+  }, [deliveryStatus, dialogId]);
 
   async function handleSend(event) {
     event.preventDefault();
@@ -193,19 +222,33 @@ export function DialogPage({
           <div className="empty-state">История пустая</div>
         ) : null}
 
-        {messages.map((message) => {
+        {messages.map((message, index) => {
+          const previousMessage = messages[index - 1];
+          const nextMessage = messages[index + 1];
           const isOwn = message.sender_username === me.username;
+          const showDateDivider = shouldShowDateDivider(message, previousMessage);
+          const showFooter = shouldShowMessageFooter(message, nextMessage);
 
           return (
-            <article className={`message${isOwn ? " own" : ""}`} key={message.id}>
-              <p className="message-meta">{formatDateTime(message.created_at)}</p>
-              <p className="message-text">{message.text}</p>
-              {isOwn ? (
-                <p className="message-status">
-                  {messageStatusLabel(message.status)}
-                </p>
+            <div className="message-row" key={message.id}>
+              {showDateDivider ? (
+                <div className="date-divider">
+                  <span>{formatMessageDate(message.created_at)}</span>
+                </div>
               ) : null}
-            </article>
+
+              <article className={`message${isOwn ? " own" : ""}`}>
+                <p className="message-text">{message.text}</p>
+                {showFooter ? (
+                  <p className="message-footer">
+                    <span>{formatMessageTime(message.created_at)}</span>
+                    {isOwn ? (
+                      <span>{messageStatusLabel(message.status)}</span>
+                    ) : null}
+                  </p>
+                ) : null}
+              </article>
+            </div>
           );
         })}
 
