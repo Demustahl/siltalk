@@ -14,7 +14,8 @@ import { LoginPage } from "./pages/LoginPage.jsx";
 import { NewDialogPage } from "./pages/NewDialogPage.jsx";
 import { RegisterPage } from "./pages/RegisterPage.jsx";
 
-const DEFAULT_API_URL = "http://localhost:8000";
+const DEFAULT_API_URL = "http://127.0.0.1:8000";
+const API_URL = cleanApiUrl(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
 
 function readRoute() {
   const hash = window.location.hash.replace(/^#\/?/, "");
@@ -38,14 +39,11 @@ function readRoute() {
 
 export function App() {
   const [route, setRoute] = useState(readRoute);
-  const [apiUrl, setApiUrl] = useState(
-    localStorage.getItem("apiUrl") || DEFAULT_API_URL,
-  );
   const [token, setToken] = useState(localStorage.getItem("accessToken") || "");
+  const [authNotice, setAuthNotice] = useState("");
   const [me, setMe] = useState(null);
   const [e2ee, setE2ee] = useState(null);
   const [dialogs, setDialogs] = useState([]);
-  const [socketStatus, setSocketStatus] = useState("offline");
   const [startupError, setStartupError] = useState("");
   const [isStarting, setIsStarting] = useState(false);
   const [realtimeMessage, setRealtimeMessage] = useState(null);
@@ -53,7 +51,7 @@ export function App() {
   const socketRef = useRef(null);
   const pendingStatusesRef = useRef([]);
 
-  const api = useMemo(() => createApiClient(apiUrl, token), [apiUrl, token]);
+  const api = useMemo(() => createApiClient(API_URL, token), [token]);
 
   const navigate = useCallback((path) => {
     window.location.hash = path;
@@ -72,7 +70,6 @@ export function App() {
     setMe(null);
     setE2ee(null);
     setDialogs([]);
-    setSocketStatus("offline");
   }, []);
 
   const logout = useCallback(() => {
@@ -92,11 +89,8 @@ export function App() {
   }, [api, token]);
 
   const finishLogin = useCallback(
-    async (nextApiUrl, nextToken) => {
-      const cleanedApiUrl = cleanApiUrl(nextApiUrl);
-      localStorage.setItem("apiUrl", cleanedApiUrl);
+    async (nextToken) => {
       localStorage.setItem("accessToken", nextToken);
-      setApiUrl(cleanedApiUrl);
       setToken(nextToken);
       navigate("/dialogs");
     },
@@ -104,20 +98,21 @@ export function App() {
   );
 
   const handleLogin = useCallback(
-    async ({ apiUrl: nextApiUrl, username, password }) => {
-      const loginApi = createApiClient(nextApiUrl, "");
+    async ({ username, password }) => {
+      const loginApi = createApiClient(API_URL, "");
       const tokenData = await loginApi.login(
         normalizeUsername(username),
         password,
       );
-      await finishLogin(nextApiUrl, tokenData.access_token);
+      setAuthNotice("");
+      await finishLogin(tokenData.access_token);
     },
     [finishLogin],
   );
 
   const handleRegister = useCallback(
-    async ({ apiUrl: nextApiUrl, username, password, displayName }) => {
-      const registerApi = createApiClient(nextApiUrl, "");
+    async ({ username, password, displayName }) => {
+      const registerApi = createApiClient(API_URL, "");
       const normalizedUsername = normalizeUsername(username);
 
       await registerApi.register({
@@ -126,10 +121,10 @@ export function App() {
         display_name: displayName.trim() || null,
       });
 
-      const tokenData = await registerApi.login(normalizedUsername, password);
-      await finishLogin(nextApiUrl, tokenData.access_token);
+      setAuthNotice("Аккаунт создан. Теперь войдите.");
+      navigate("/login");
     },
-    [finishLogin],
+    [navigate],
   );
 
   const rejectPendingStatuses = useCallback((message) => {
@@ -270,13 +265,8 @@ export function App() {
       return undefined;
     }
 
-    const websocket = new WebSocket(buildWebSocketUrl(apiUrl, token));
+    const websocket = new WebSocket(buildWebSocketUrl(API_URL, token));
     socketRef.current = websocket;
-    setSocketStatus("connecting");
-
-    websocket.addEventListener("open", () => {
-      setSocketStatus("online");
-    });
 
     websocket.addEventListener("message", async (event) => {
       const data = JSON.parse(event.data);
@@ -294,6 +284,12 @@ export function App() {
         return;
       }
 
+      if (data.type === "messages_read") {
+        setDeliveryStatus(data);
+        loadDialogs().catch(() => undefined);
+        return;
+      }
+
       if (data.type === "message") {
         const text = await decryptEnvelope(data.ciphertext, me.username, e2ee.keyPair);
         setRealtimeMessage({
@@ -304,14 +300,6 @@ export function App() {
       }
     });
 
-    websocket.addEventListener("close", () => {
-      setSocketStatus("offline");
-    });
-
-    websocket.addEventListener("error", () => {
-      setSocketStatus("offline");
-    });
-
     return () => {
       websocket.close();
       if (socketRef.current === websocket) {
@@ -319,7 +307,6 @@ export function App() {
       }
     };
   }, [
-    apiUrl,
     e2ee,
     loadDialogs,
     me,
@@ -332,7 +319,6 @@ export function App() {
     if (route.name === "register") {
       return (
         <RegisterPage
-          apiUrl={apiUrl}
           onRegister={handleRegister}
           navigate={navigate}
         />
@@ -340,7 +326,11 @@ export function App() {
     }
 
     return (
-      <LoginPage apiUrl={apiUrl} onLogin={handleLogin} navigate={navigate} />
+      <LoginPage
+        notice={authNotice}
+        onLogin={handleLogin}
+        navigate={navigate}
+      />
     );
   }
 
@@ -363,7 +353,6 @@ export function App() {
       me={me}
       dialogs={dialogs}
       activeDialogId={activeDialogId}
-      socketStatus={socketStatus}
       onLogout={logout}
       onRefreshDialogs={loadDialogs}
       navigate={navigate}

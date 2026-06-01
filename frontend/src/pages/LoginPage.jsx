@@ -1,9 +1,8 @@
 import { LogIn } from "lucide-react";
 import { useState } from "react";
 
-export function LoginPage({ apiUrl, onLogin, navigate }) {
+export function LoginPage({ notice, onLogin, navigate }) {
   const [form, setForm] = useState({
-    apiUrl,
     username: "",
     password: "",
   });
@@ -38,17 +37,6 @@ export function LoginPage({ apiUrl, onLogin, navigate }) {
           <p className="eyebrow">SilTalk</p>
           <h1>Вход</h1>
         </div>
-
-        <label>
-          Backend URL
-          <input
-            name="apiUrl"
-            type="url"
-            value={form.apiUrl}
-            onChange={updateField}
-            required
-          />
-        </label>
 
         <label>
           Username
@@ -91,6 +79,7 @@ export function LoginPage({ apiUrl, onLogin, navigate }) {
           Зарегистрироваться
         </button>
 
+        {notice ? <p className="status-line success">{notice}</p> : null}
         {error ? <p className="status-line error">{error}</p> : null}
       </form>
     </main>

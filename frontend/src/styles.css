@@ -130,7 +130,7 @@ h2 {
 
 .sidebar {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 16px;
   min-height: 100vh;
   border-right: 1px solid var(--line);
@@ -143,8 +143,7 @@ h2 {
 .page-header,
 .conversation-header,
 .dialog-row,
-.message-meta,
-.socket-line {
+.message-meta {
   display: flex;
   align-items: center;
 }
@@ -296,7 +295,6 @@ h2 {
 .dialog-meta,
 .message-status,
 .status-line,
-.socket-line,
 .empty-state,
 .user-result small {
   color: var(--muted);
@@ -315,27 +313,6 @@ h2 {
   background: var(--accent);
   font-size: 12px;
   font-weight: 700;
-}
-
-.socket-line {
-  gap: 8px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.socket-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-
-.socket-dot.online {
-  background: #12b76a;
-}
-
-.socket-dot.connecting {
-  background: #f79009;
 }
 
 .search-form,
@@ -448,6 +425,10 @@ h2 {
 
 .status-line.error {
   color: var(--danger);
+}
+
+.status-line.success {
+  color: #067647;
 }
 
 .empty-state {

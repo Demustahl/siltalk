@@ -6,17 +6,29 @@ export function createApiClient(apiUrl, token) {
   const baseUrl = cleanApiUrl(apiUrl);
 
   async function request(path, options = {}) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
-      },
-    });
+    let response;
+    try {
+      response = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(options.headers || {}),
+        },
+      });
+    } catch {
+      throw new Error("Backend недоступен или база данных не запущена");
+    }
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null;
+      }
+    }
 
     if (!response.ok) {
       const message = data?.detail || "Ошибка запроса";

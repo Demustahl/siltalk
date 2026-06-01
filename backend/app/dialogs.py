@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Query, status
@@ -9,6 +10,7 @@ from app.auth import get_current_user
 from app.database import get_db_session
 from app.messages import MESSAGE_STATUS_READ
 from app.models import Dialog, DialogMember, Message, MessageDeliveryStatus, User
+from app.realtime import manager
 from app.schemas import DialogRead, DialogReadMark, MessageRead
 
 DbSession = Annotated[Session, Depends(get_db_session)]
@@ -142,7 +144,7 @@ def read_dialog_messages(
 
 
 # Помечает входящие сообщения диалога прочитанными
-def mark_dialog_messages_read(
+async def mark_dialog_messages_read(
     dialog_id: uuid.UUID,
     current_user: CurrentUser,
     db_session: DbSession,
@@ -158,7 +160,8 @@ def mark_dialog_messages_read(
         MessageDeliveryStatus.user_id == current_user.id,
     )
     statement = (
-        select(Message.id, MessageDeliveryStatus)
+        select(Message.id, User.username, MessageDeliveryStatus)
+        .join(User, User.id == Message.sender_user_id)
         .outerjoin(MessageDeliveryStatus, status_join)
         .where(
             Message.dialog_id == dialog_id,
@@ -170,8 +173,9 @@ def mark_dialog_messages_read(
         )
     )
     rows = db_session.execute(statement).all()
+    sender_messages: defaultdict[str, list[uuid.UUID]] = defaultdict(list)
 
-    for message_id, delivery_status in rows:
+    for message_id, sender_username, delivery_status in rows:
         if delivery_status is None:
             db_session.add(
                 MessageDeliveryStatus(
@@ -183,6 +187,20 @@ def mark_dialog_messages_read(
         else:
             delivery_status.status = MESSAGE_STATUS_READ
 
+        sender_messages[sender_username].append(message_id)
+
     db_session.commit()
+
+    for sender_username, message_ids in sender_messages.items():
+        await manager.send_to_client(
+            sender_username,
+            {
+                "type": "messages_read",
+                "dialog_id": str(dialog_id),
+                "reader": current_user.username,
+                "status": MESSAGE_STATUS_READ,
+                "message_ids": [str(message_id) for message_id in message_ids],
+            },
+        )
 
     return DialogReadMark(dialog_id=dialog_id, marked_read_count=len(rows))

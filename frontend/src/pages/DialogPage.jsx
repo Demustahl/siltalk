@@ -1,12 +1,12 @@
 import { ArrowLeft, Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { decryptEnvelope } from "../lib/e2ee.js";
 import {
   formatDateTime,
   getDialogReceiver,
   messageStatusLabel,
 } from "../lib/format.js";
-import { decryptEnvelope } from "../lib/e2ee.js";
 
 export function DialogPage({
   api,
@@ -97,14 +97,24 @@ export function DialogPage({
       return;
     }
 
-    setMessages((currentMessages) =>
-      currentMessages.map((message) =>
-        message.id === deliveryStatus.message_id
-          ? { ...message, status: deliveryStatus.status }
-          : message,
-      ),
-    );
-  }, [deliveryStatus, dialogId]);
+    setMessages((currentMessages) => {
+      const readMessageIds = new Set(deliveryStatus.message_ids || []);
+      let hasChanges = false;
+
+      const nextMessages = currentMessages.map((message) => {
+        const isStatusTarget =
+          message.id === deliveryStatus.message_id || readMessageIds.has(message.id);
+        if (!isStatusTarget || message.status === deliveryStatus.status) {
+          return message;
+        }
+
+        hasChanges = true;
+        return { ...message, status: deliveryStatus.status };
+      });
+
+      return hasChanges ? nextMessages : currentMessages;
+    });
+  }, [deliveryStatus, dialogId, messages]);
 
   async function handleSend(event) {
     event.preventDefault();
@@ -188,10 +198,7 @@ export function DialogPage({
 
           return (
             <article className={`message${isOwn ? " own" : ""}`} key={message.id}>
-              <p className="message-meta">
-                <span>{message.sender_username}</span>
-                <span>{formatDateTime(message.created_at)}</span>
-              </p>
+              <p className="message-meta">{formatDateTime(message.created_at)}</p>
               <p className="message-text">{message.text}</p>
               {isOwn ? (
                 <p className="message-status">

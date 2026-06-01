@@ -12,7 +12,6 @@ export function AppLayout({
   me,
   dialogs,
   activeDialogId,
-  socketStatus,
   onLogout,
   onRefreshDialogs,
   navigate,
@@ -94,10 +93,6 @@ export function AppLayout({
           )}
         </div>
 
-        <footer className="socket-line">
-          <span className={`socket-dot ${socketStatus}`} />
-          <span>{socketStatus}</span>
-        </footer>
       </aside>
 
       <section className="workspace">{children}</section>

@@ -10,7 +10,10 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# Быстрее показывает ошибку, если локальная PostgreSQL БД выключена
+connect_args = {"connect_timeout": 3} if DATABASE_URL.startswith("postgresql") else {}
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,

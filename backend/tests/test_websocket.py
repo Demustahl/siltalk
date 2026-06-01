@@ -5,6 +5,7 @@ from collections.abc import Generator
 from typing import Any
 from urllib.parse import urlsplit
 
+import httpx
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -12,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth import create_access_token, hash_password
 from app.database import Base, get_db_session
 from app.main import app
+from app.messages import save_direct_message
 from app.models import DialogMember, Message, MessageDeliveryStatus, User
 from app.realtime import manager
 
@@ -30,6 +32,10 @@ class WebSocketTestApp:
             class_=Session,
             expire_on_commit=False,
         )
+        self.client = httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        )
 
     async def __aenter__(self) -> "WebSocketTestApp":
         Base.metadata.create_all(bind=self.engine)
@@ -37,6 +43,7 @@ class WebSocketTestApp:
         return self
 
     async def __aexit__(self, *args: object) -> None:
+        await self.client.aclose()
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=self.engine)
         self.engine.dispose()
@@ -71,6 +78,22 @@ class WebSocketTestApp:
     def get_messages(self) -> list[Message]:
         with self.session_local() as db_session:
             return list(db_session.scalars(select(Message)).all())
+
+    # Сохраняет сообщение для HTTP/WebSocket тестов
+    def save_message(self, sender: User, receiver: str, ciphertext: str) -> Message:
+        with self.session_local() as db_session:
+            attached_sender = db_session.get(User, sender.id)
+            assert attached_sender is not None
+
+            message = save_direct_message(
+                db_session,
+                attached_sender,
+                receiver,
+                ciphertext,
+            )
+            assert message is not None
+
+            return message
 
     # Возвращает статусы доставки сообщений
     def get_delivery_statuses(self) -> list[MessageDeliveryStatus]:
@@ -299,6 +322,34 @@ def test_websocket_confirms_saved_message_when_receiver_is_offline() -> None:
             delivery_statuses = test_app.get_delivery_statuses()
             assert len(delivery_statuses) == 1
             assert delivery_statuses[0].status == "sent"
+
+    asyncio.run(run_test())
+
+
+def test_mark_read_sends_status_update_to_online_sender() -> None:
+    async def run_test() -> None:
+        async with WebSocketTestApp() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+            user1_token = create_access_token(user1)
+            user2_token = create_access_token(user2)
+            message = test_app.save_message(user1, "user2", "ciphertext-hello")
+
+            async with WebSocketSession(f"/ws?token={user1_token}") as user1_socket:
+                response = await test_app.client.post(
+                    f"/dialogs/{message.dialog_id}/read",
+                    headers={"Authorization": f"Bearer {user2_token}"},
+                )
+
+                assert response.status_code == 200
+                assert response.json()["marked_read_count"] == 1
+                assert await user1_socket.receive_json() == {
+                    "type": "messages_read",
+                    "dialog_id": str(message.dialog_id),
+                    "reader": "user2",
+                    "status": "read",
+                    "message_ids": [str(message.id)],
+                }
 
     asyncio.run(run_test())
 

@@ -1,9 +1,8 @@
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
 
-export function RegisterPage({ apiUrl, onRegister, navigate }) {
+export function RegisterPage({ onRegister, navigate }) {
   const [form, setForm] = useState({
-    apiUrl,
     username: "",
     password: "",
     displayName: "",
@@ -39,17 +38,6 @@ export function RegisterPage({ apiUrl, onRegister, navigate }) {
           <p className="eyebrow">SilTalk</p>
           <h1>Регистрация</h1>
         </div>
-
-        <label>
-          Backend URL
-          <input
-            name="apiUrl"
-            type="url"
-            value={form.apiUrl}
-            onChange={updateField}
-            required
-          />
-        </label>
 
         <label>
           Username
