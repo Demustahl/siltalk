@@ -1,6 +1,15 @@
-import { ArrowLeft, Send } from "lucide-react";
+import {
+  ArrowLeft,
+  Mic,
+  MoreHorizontal,
+  Paperclip,
+  Send,
+  ShieldCheck,
+  Smile,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Avatar } from "../components/Avatar.jsx";
 import { decryptEnvelope } from "../lib/e2ee.js";
 import {
   formatMessageDate,
@@ -203,20 +212,35 @@ export function DialogPage({
     <div className="conversation-page">
       <header className="conversation-header">
         <button
-          className="ghost-button text-icon"
+          className="icon-button header-back"
           type="button"
+          title="Назад"
           onClick={() => navigate("/dialogs")}
         >
           <ArrowLeft size={18} aria-hidden="true" />
-          Назад
         </button>
-        <div>
-          <p className="eyebrow">Диалог</p>
+        <Avatar username={receiver || dialog.members[0]} size="large" online />
+        <div className="conversation-title">
           <h2>{receiver || dialog.members.join(", ")}</h2>
+          <p>
+            <span className="online-dot" />
+            Защищенный диалог
+          </p>
+        </div>
+        <div className="conversation-actions">
+          <button className="icon-button glass-button" type="button" title="Меню">
+            <MoreHorizontal size={19} aria-hidden="true" />
+          </button>
         </div>
       </header>
 
       <div className="messages-list">
+        <div className="encryption-banner">
+          <ShieldCheck size={17} aria-hidden="true" />
+          <span>E2EE включено</span>
+          <p>Только вы и собеседник видите эти сообщения.</p>
+        </div>
+
         {isLoading ? <div className="empty-state">Загружаю</div> : null}
         {!isLoading && messages.length === 0 ? (
           <div className="empty-state">История пустая</div>
@@ -256,15 +280,24 @@ export function DialogPage({
       </div>
 
       <form className="message-form" onSubmit={handleSend}>
+        <button className="icon-button glass-button" type="button" title="Вложение">
+          <Paperclip size={20} aria-hidden="true" />
+        </button>
         <input
           type="text"
           placeholder="Сообщение"
           value={messageText}
           onChange={(event) => setMessageText(event.target.value)}
         />
-        <button type="submit" disabled={isSending}>
+        <button className="icon-button glass-button" type="button" title="Эмодзи">
+          <Smile size={20} aria-hidden="true" />
+        </button>
+        <button className="icon-button glass-button" type="button" title="Голос">
+          <Mic size={20} aria-hidden="true" />
+        </button>
+        <button className="send-button" type="submit" disabled={isSending}>
           <Send size={18} aria-hidden="true" />
-          {isSending ? "Отправляю" : "Отправить"}
+          <span>{isSending ? "..." : "Отправить"}</span>
         </button>
       </form>
 

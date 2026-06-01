@@ -353,6 +353,7 @@ export function App() {
       me={me}
       dialogs={dialogs}
       activeDialogId={activeDialogId}
+      currentRoute={route.name}
       onLogout={logout}
       onRefreshDialogs={loadDialogs}
       navigate={navigate}

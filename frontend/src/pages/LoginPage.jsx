@@ -1,4 +1,4 @@
-import { LogIn } from "lucide-react";
+import { LogIn, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 export function LoginPage({ notice, onLogin, navigate }) {
@@ -33,7 +33,10 @@ export function LoginPage({ notice, onLogin, navigate }) {
   return (
     <main className="auth-page">
       <form className="auth-panel" onSubmit={handleSubmit}>
-        <div>
+        <div className="auth-brand">
+          <span className="brand-mark">
+            <ShieldCheck size={28} aria-hidden="true" />
+          </span>
           <p className="eyebrow">SilTalk</p>
           <h1>Вход</h1>
         </div>

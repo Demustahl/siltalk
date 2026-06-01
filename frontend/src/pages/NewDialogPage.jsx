@@ -1,6 +1,7 @@
-import { KeyRound, Search, Send } from "lucide-react";
+import { ArrowLeft, KeyRound, Search, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { Avatar } from "../components/Avatar.jsx";
 import { normalizeUsername } from "../lib/format.js";
 
 export function NewDialogPage({
@@ -75,6 +76,14 @@ export function NewDialogPage({
   return (
     <div className="page-surface">
       <header className="page-header">
+        <button
+          className="icon-button header-back"
+          type="button"
+          title="Назад"
+          onClick={() => navigate("/dialogs")}
+        >
+          <ArrowLeft size={18} aria-hidden="true" />
+        </button>
         <div>
           <p className="eyebrow">Новый диалог</p>
           <h2>Поиск пользователя</h2>
@@ -107,6 +116,7 @@ export function NewDialogPage({
             disabled={!user.has_public_key}
             onClick={() => setSelectedUsername(user.username)}
           >
+            <Avatar username={user.username} size="small" />
             <span>
               <strong>{user.username}</strong>
               {user.display_name ? <small>{user.display_name}</small> : null}
@@ -120,6 +130,10 @@ export function NewDialogPage({
       </div>
 
       <form className="compose-panel" onSubmit={handleSend}>
+        <div className="compose-heading">
+          <ShieldCheck size={18} aria-hidden="true" />
+          <span>Сообщение будет зашифровано перед отправкой</span>
+        </div>
         <label>
           Получатель
           <input
