@@ -17,6 +17,7 @@ export function NewDialogPage({
   const [messageText, setMessageText] = useState("");
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -33,11 +34,12 @@ export function NewDialogPage({
     }
 
     setError("");
+    setHasSearched(true);
     setIsSearching(true);
 
     try {
       const foundUsers = await api.searchUsers(username);
-      setResults(foundUsers);
+      setResults(foundUsers.filter((user) => user.has_public_key));
     } catch (caughtError) {
       setError(caughtError.message);
     } finally {
@@ -108,12 +110,17 @@ export function NewDialogPage({
       </form>
 
       <div className="search-results">
+        {hasSearched && !isSearching && results.length === 0 ? (
+          <div className="empty-state compact">
+            Пользователей с доступным защищенным чатом не найдено
+          </div>
+        ) : null}
+
         {results.map((user) => (
           <button
             className="user-result"
             key={user.id}
             type="button"
-            disabled={!user.has_public_key}
             onClick={() => setSelectedUsername(user.username)}
           >
             <Avatar username={user.username} size="small" />
@@ -121,9 +128,9 @@ export function NewDialogPage({
               <strong>{user.username}</strong>
               {user.display_name ? <small>{user.display_name}</small> : null}
             </span>
-            <span className={user.has_public_key ? "key-ok" : "key-missing"}>
+            <span className="key-ok">
               <KeyRound size={15} aria-hidden="true" />
-              {user.has_public_key ? "ключ есть" : "нет ключа"}
+              защищенный чат
             </span>
           </button>
         ))}
