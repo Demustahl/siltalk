@@ -1,7 +1,12 @@
 import { MessageCircle, Search, ShieldCheck } from "lucide-react";
 
 import { Avatar } from "../components/Avatar.jsx";
-import { formatDateTime, getDialogReceiver } from "../lib/format.js";
+import {
+  formatDateTime,
+  getDialogReceiver,
+  getDialogReceiverProfile,
+  getUserDisplayName,
+} from "../lib/format.js";
 
 export function DialogsPage({ dialogs, me, navigate }) {
   return (
@@ -25,7 +30,9 @@ export function DialogsPage({ dialogs, me, navigate }) {
           </div>
         ) : (
           dialogs.map((dialog) => {
+            const receiverProfile = getDialogReceiverProfile(dialog, me.username);
             const receiver = getDialogReceiver(dialog, me.username);
+            const receiverName = getUserDisplayName(receiverProfile) || receiver;
 
             return (
               <button
@@ -34,11 +41,16 @@ export function DialogsPage({ dialogs, me, navigate }) {
                 type="button"
                 onClick={() => navigate(`/dialogs/${dialog.id}`)}
               >
-                <Avatar username={receiver || dialog.members[0]} size="medium" />
+                <Avatar
+                  username={receiver || dialog.members[0]}
+                  size="medium"
+                  avatarId={receiverProfile?.avatar_id}
+                  avatarDataUrl={receiverProfile?.avatar_data_url}
+                />
                 <span className="dialog-card-body">
                   <span className="dialog-row">
                     <span className="dialog-card-title">
-                      {receiver || dialog.members.join(", ")}
+                      {receiverName || dialog.members.join(", ")}
                     </span>
                     {dialog.unread_count > 0 ? (
                       <span className="unread-badge">{dialog.unread_count}</span>

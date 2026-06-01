@@ -19,7 +19,23 @@ class UserRead(BaseModel):
     id: uuid.UUID
     username: str
     display_name: str | None
+    avatar_id: str | None
+    avatar_data_url: str | None
     created_at: datetime
+
+
+class UserProfileUpdate(BaseModel):
+    display_name: str | None = Field(default=None, max_length=120)
+    avatar_id: str | None = Field(default=None, min_length=1, max_length=64)
+    avatar_data_url: str | None = Field(default=None, max_length=300_000)
+
+
+class UserPublicRead(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str | None
+    avatar_id: str | None
+    avatar_data_url: str | None
 
 
 class TokenResponse(BaseModel):
@@ -44,6 +60,7 @@ class DialogRead(BaseModel):
     dialog_type: str
     title: str | None
     members: list[str]
+    member_profiles: list[UserPublicRead]
     unread_count: int
     created_at: datetime
 
@@ -67,4 +84,6 @@ class UserSearchRead(BaseModel):
     id: uuid.UUID
     username: str
     display_name: str | None
+    avatar_id: str | None
+    avatar_data_url: str | None
     has_public_key: bool

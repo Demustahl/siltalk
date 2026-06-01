@@ -2,7 +2,7 @@ import { ArrowLeft, KeyRound, Search, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Avatar } from "../components/Avatar.jsx";
-import { normalizeUsername } from "../lib/format.js";
+import { getUserDisplayName, normalizeUsername } from "../lib/format.js";
 
 export function NewDialogPage({
   api,
@@ -123,10 +123,15 @@ export function NewDialogPage({
             type="button"
             onClick={() => setSelectedUsername(user.username)}
           >
-            <Avatar username={user.username} size="small" />
+            <Avatar
+              username={user.username}
+              size="small"
+              avatarId={user.avatar_id}
+              avatarDataUrl={user.avatar_data_url}
+            />
             <span>
-              <strong>{user.username}</strong>
-              {user.display_name ? <small>{user.display_name}</small> : null}
+              <strong>{getUserDisplayName(user)}</strong>
+              <small>@{user.username}</small>
             </span>
             <span className="key-ok">
               <KeyRound size={15} aria-hidden="true" />

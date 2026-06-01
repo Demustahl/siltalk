@@ -91,6 +91,12 @@ def test_search_users_by_username_returns_safe_public_data() -> None:
                 json={"public_key": make_public_key(1)},
             )
             assert publish_response.status_code == 200
+            profile_response = await test_app.client.put(
+                "/me/profile",
+                headers=auth_headers(bob_token),
+                json={"avatar_id": "ava-robot"},
+            )
+            assert profile_response.status_code == 200
 
             response = await test_app.client.get(
                 "/users/search?username=bo",
@@ -99,9 +105,10 @@ def test_search_users_by_username_returns_safe_public_data() -> None:
 
             assert response.status_code == 200
             response_data = response.json()
-            assert [user["username"] for user in response_data] == ["bob", "bobby"]
+            assert [user["username"] for user in response_data] == ["bob"]
             assert response_data[0]["has_public_key"] is True
-            assert response_data[1]["has_public_key"] is False
+            assert response_data[0]["avatar_id"] == "ava-robot"
+            assert response_data[0]["avatar_data_url"] is None
             assert "password" not in response_data[0]
             assert "password_hash" not in response_data[0]
             assert "private_key" not in response_data[0]

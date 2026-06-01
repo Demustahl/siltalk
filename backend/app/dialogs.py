@@ -11,7 +11,7 @@ from app.database import get_db_session
 from app.messages import MESSAGE_STATUS_READ
 from app.models import Dialog, DialogMember, Message, MessageDeliveryStatus, User
 from app.realtime import manager
-from app.schemas import DialogRead, DialogReadMark, MessageRead
+from app.schemas import DialogRead, DialogReadMark, MessageRead, UserPublicRead
 
 DbSession = Annotated[Session, Depends(get_db_session)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -27,6 +27,29 @@ def get_dialog_members(db_session: Session, dialog_id: uuid.UUID) -> list[str]:
     )
 
     return list(db_session.scalars(statement).all())
+
+
+def get_dialog_member_profiles(
+    db_session: Session,
+    dialog_id: uuid.UUID,
+) -> list[UserPublicRead]:
+    statement = (
+        select(User)
+        .join(DialogMember, DialogMember.user_id == User.id)
+        .where(DialogMember.dialog_id == dialog_id)
+        .order_by(User.username)
+    )
+
+    return [
+        UserPublicRead(
+            id=user.id,
+            username=user.username,
+            display_name=user.display_name,
+            avatar_id=user.avatar_id,
+            avatar_data_url=user.avatar_data_url,
+        )
+        for user in db_session.scalars(statement).all()
+    ]
 
 
 # Проверяет, что пользователь входит в диалог
@@ -91,21 +114,26 @@ def read_dialogs(
     )
     dialogs = db_session.scalars(statement).all()
 
-    return [
-        DialogRead(
-            id=dialog.id,
-            dialog_type=dialog.dialog_type,
-            title=dialog.title,
-            members=get_dialog_members(db_session, dialog.id),
-            unread_count=count_unread_messages(
-                db_session,
-                dialog.id,
-                current_user.id,
-            ),
-            created_at=dialog.created_at,
+    dialog_reads = []
+    for dialog in dialogs:
+        member_profiles = get_dialog_member_profiles(db_session, dialog.id)
+        dialog_reads.append(
+            DialogRead(
+                id=dialog.id,
+                dialog_type=dialog.dialog_type,
+                title=dialog.title,
+                members=[member.username for member in member_profiles],
+                member_profiles=member_profiles,
+                unread_count=count_unread_messages(
+                    db_session,
+                    dialog.id,
+                    current_user.id,
+                ),
+                created_at=dialog.created_at,
+            )
         )
-        for dialog in dialogs
-    ]
+
+    return dialog_reads
 
 
 # Возвращает историю сообщений из диалога

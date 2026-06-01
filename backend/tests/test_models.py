@@ -36,6 +36,13 @@ def test_users_store_password_hash_without_plain_password() -> None:
     assert "password" not in columns
 
 
+def test_users_store_profile_avatar_fields() -> None:
+    columns = set(Base.metadata.tables["users"].columns.keys())
+
+    assert "avatar_id" in columns
+    assert "avatar_data_url" in columns
+
+
 def test_device_keys_store_only_public_key_material() -> None:
     columns = set(Base.metadata.tables["device_keys"].columns.keys())
 

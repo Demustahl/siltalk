@@ -13,6 +13,7 @@ import { DialogsPage } from "./pages/DialogsPage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { NewDialogPage } from "./pages/NewDialogPage.jsx";
 import { RegisterPage } from "./pages/RegisterPage.jsx";
+import { SettingsPage } from "./pages/SettingsPage.jsx";
 
 const DEFAULT_API_URL = "http://127.0.0.1:8000";
 const API_URL = cleanApiUrl(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
@@ -29,6 +30,9 @@ function readRoute() {
   }
   if (parts[0] === "new") {
     return { name: "new", username: parts[1] || "" };
+  }
+  if (parts[0] === "settings") {
+    return { name: "settings" };
   }
   if (parts[0] === "dialogs" && parts[1]) {
     return { name: "dialog", dialogId: parts[1] };
@@ -197,6 +201,17 @@ export function App() {
       return deliveryPromise;
     },
     [api, e2ee, me, waitForDeliveryStatus],
+  );
+
+  const updateProfile = useCallback(
+    async (profileData) => {
+      const updatedUser = await api.updateProfile(profileData);
+      setMe(updatedUser);
+      await loadDialogs();
+
+      return updatedUser;
+    },
+    [api, loadDialogs],
   );
 
   useEffect(() => {
@@ -385,6 +400,15 @@ export function App() {
 
       {route.name === "dialogs" ? (
         <DialogsPage dialogs={dialogs} me={me} navigate={navigate} />
+      ) : null}
+
+      {route.name === "settings" ? (
+        <SettingsPage
+          me={me}
+          e2ee={e2ee}
+          onUpdateProfile={updateProfile}
+          navigate={navigate}
+        />
       ) : null}
     </AppLayout>
   );

@@ -82,12 +82,58 @@ def test_register_creates_user_without_password_in_response() -> None:
             response_data = response.json()
             assert response_data["username"] == "userone"
             assert response_data["display_name"] == "User One"
+            assert response_data["avatar_id"] is None
+            assert response_data["avatar_data_url"] is None
             assert "password" not in response_data
             assert "password_hash" not in response_data
 
             user = test_app.get_user("userone")
             assert user is not None
             assert user.password_hash != "secret-password"
+
+    asyncio.run(run_test())
+
+
+def test_profile_update_changes_display_name_and_avatar() -> None:
+    async def run_test() -> None:
+        async with AuthTestClient() as client:
+            await client.post(
+                "/auth/register",
+                json={
+                    "username": "userone",
+                    "password": "secret-password",
+                    "display_name": "User One",
+                },
+            )
+            login_response = await client.post(
+                "/auth/login",
+                json={"username": "userone", "password": "secret-password"},
+            )
+            token = login_response.json()["access_token"]
+            headers = {"Authorization": f"Bearer {token}"}
+
+            preset_response = await client.put(
+                "/me/profile",
+                headers=headers,
+                json={"display_name": "  Updated User  ", "avatar_id": "ava-cat"},
+            )
+
+            assert preset_response.status_code == 200
+            assert preset_response.json()["display_name"] == "Updated User"
+            assert preset_response.json()["avatar_id"] == "ava-cat"
+            assert preset_response.json()["avatar_data_url"] is None
+
+            avatar_data_url = "data:image/png;base64,ZmFrZS1pbWFnZQ=="
+            custom_response = await client.put(
+                "/me/profile",
+                headers=headers,
+                json={"avatar_data_url": avatar_data_url},
+            )
+
+            assert custom_response.status_code == 200
+            assert custom_response.json()["avatar_id"] is None
+            assert custom_response.json()["avatar_data_url"] == avatar_data_url
+            assert "password_hash" not in custom_response.json()
 
     asyncio.run(run_test())
 

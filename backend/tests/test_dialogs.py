@@ -111,6 +111,15 @@ def test_read_dialogs_returns_only_current_user_dialogs() -> None:
             assert len(response_data) == 1
             assert response_data[0]["dialog_type"] == "direct"
             assert set(response_data[0]["members"]) == {"user1", "user2"}
+            member_usernames = {
+                profile["username"]
+                for profile in response_data[0]["member_profiles"]
+            }
+            assert member_usernames == {
+                "user1",
+                "user2",
+            }
+            assert "password_hash" not in response_data[0]["member_profiles"][0]
             assert response_data[0]["unread_count"] == 0
 
     asyncio.run(run_test())

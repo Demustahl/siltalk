@@ -1,4 +1,7 @@
+import base64
+import binascii
 import hashlib
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -18,12 +21,24 @@ from app.config import (
 )
 from app.database import get_db_session
 from app.models import User
-from app.schemas import TokenResponse, UserCreate, UserLogin, UserRead
+from app.schemas import (
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserProfileUpdate,
+    UserRead,
+)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 DbSession = Annotated[Session, Depends(get_db_session)]
 BearerToken = Annotated[str, Depends(oauth2_scheme)]
+AVATAR_ID_PATTERN = re.compile(r"^[a-z0-9_-]{1,64}$")
+AVATAR_DATA_URL_PREFIXES = (
+    "data:image/png;base64,",
+    "data:image/jpeg;base64,",
+    "data:image/webp;base64,",
+)
 
 
 # Делает username одинаковым для поиска и сохранения
@@ -78,8 +93,59 @@ def build_user_response(user: User) -> UserRead:
         id=user.id,
         username=user.username,
         display_name=user.display_name,
+        avatar_id=user.avatar_id,
+        avatar_data_url=user.avatar_data_url,
         created_at=user.created_at,
     )
+
+
+def normalize_display_name(display_name: str | None) -> str | None:
+    if display_name is None:
+        return None
+
+    normalized_display_name = display_name.strip()
+    return normalized_display_name or None
+
+
+def validate_avatar_id(avatar_id: str | None) -> str | None:
+    if avatar_id is None:
+        return None
+
+    normalized_avatar_id = avatar_id.strip()
+    if not normalized_avatar_id:
+        return None
+    if AVATAR_ID_PATTERN.fullmatch(normalized_avatar_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid avatar_id",
+        )
+
+    return normalized_avatar_id
+
+
+def validate_avatar_data_url(avatar_data_url: str | None) -> str | None:
+    if avatar_data_url is None:
+        return None
+
+    normalized_avatar_data_url = avatar_data_url.strip()
+    if not normalized_avatar_data_url:
+        return None
+    if not normalized_avatar_data_url.startswith(AVATAR_DATA_URL_PREFIXES):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Avatar must be PNG, JPEG or WebP",
+        )
+
+    _, encoded_image = normalized_avatar_data_url.split(",", maxsplit=1)
+    try:
+        base64.b64decode(encoded_image, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid avatar base64",
+        ) from None
+
+    return normalized_avatar_data_url
 
 
 # Создает короткоживущий JWT-токен для пользователя
@@ -157,6 +223,33 @@ def register_user(user_data: UserCreate, db_session: DbSession) -> UserRead:
 
     db_session.refresh(user)
     return build_user_response(user)
+
+
+def update_current_user_profile(
+    profile_data: UserProfileUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db_session: DbSession,
+) -> UserRead:
+    changed_fields = profile_data.model_fields_set
+
+    if "display_name" in changed_fields:
+        current_user.display_name = normalize_display_name(profile_data.display_name)
+
+    if "avatar_data_url" in changed_fields and profile_data.avatar_data_url:
+        current_user.avatar_data_url = validate_avatar_data_url(
+            profile_data.avatar_data_url
+        )
+        current_user.avatar_id = None
+    elif "avatar_id" in changed_fields:
+        current_user.avatar_id = validate_avatar_id(profile_data.avatar_id)
+        current_user.avatar_data_url = None
+    elif "avatar_data_url" in changed_fields:
+        current_user.avatar_data_url = None
+
+    db_session.commit()
+    db_session.refresh(current_user)
+
+    return build_user_response(current_user)
 
 
 # Проверяет логин и пароль, потом выдает access-токен

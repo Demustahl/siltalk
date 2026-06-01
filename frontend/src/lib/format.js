@@ -3,7 +3,25 @@ export function normalizeUsername(username) {
 }
 
 export function getDialogReceiver(dialog, currentUsername) {
-  return dialog.members.find((member) => member !== currentUsername) || "";
+  const receiverProfile = getDialogReceiverProfile(dialog, currentUsername);
+
+  return (
+    receiverProfile?.username ||
+    dialog.members.find((member) => member !== currentUsername) ||
+    ""
+  );
+}
+
+export function getDialogReceiverProfile(dialog, currentUsername) {
+  return (
+    (dialog.member_profiles || []).find(
+      (member) => member.username !== currentUsername,
+    ) || null
+  );
+}
+
+export function getUserDisplayName(user) {
+  return user?.display_name || user?.username || "";
 }
 
 export function formatDateTime(value) {

@@ -1,6 +1,11 @@
 from fastapi import FastAPI, status
 
-from app.auth import login_user, read_current_user, register_user
+from app.auth import (
+    login_user,
+    read_current_user,
+    register_user,
+    update_current_user_profile,
+)
 from app.dialogs import mark_dialog_messages_read, read_dialog_messages, read_dialogs
 from app.keys import publish_my_public_key, read_user_public_key
 from app.realtime import websocket_chat
@@ -49,6 +54,13 @@ def register_routes(app: FastAPI) -> None:
         "/me",
         read_current_user,
         methods=["GET"],
+        response_model=UserRead,
+        tags=["auth"],
+    )
+    app.add_api_route(
+        "/me/profile",
+        update_current_user_profile,
+        methods=["PUT"],
         response_model=UserRead,
         tags=["auth"],
     )

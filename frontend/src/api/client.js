@@ -59,6 +59,13 @@ export function createApiClient(apiUrl, token) {
       return request("/me");
     },
 
+    updateProfile(profileData) {
+      return request("/me/profile", {
+        method: "PUT",
+        body: JSON.stringify(profileData),
+      });
+    },
+
     publishPublicKey(publicKey) {
       return request("/me/keys", {
         method: "PUT",

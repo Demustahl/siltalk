@@ -16,6 +16,8 @@ import {
   formatMessageTime,
   getDateKey,
   getDialogReceiver,
+  getDialogReceiverProfile,
+  getUserDisplayName,
   messageStatusLabel,
 } from "../lib/format.js";
 
@@ -62,7 +64,11 @@ export function DialogPage({
     () => dialogs.find((item) => item.id === dialogId),
     [dialogs, dialogId],
   );
+  const receiverProfile = dialog
+    ? getDialogReceiverProfile(dialog, me.username)
+    : null;
   const receiver = dialog ? getDialogReceiver(dialog, me.username) : "";
+  const receiverName = getUserDisplayName(receiverProfile) || receiver;
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [statusText, setStatusText] = useState("");
@@ -219,9 +225,14 @@ export function DialogPage({
         >
           <ArrowLeft size={18} aria-hidden="true" />
         </button>
-        <Avatar username={receiver || dialog.members[0]} size="large" online />
+        <Avatar
+          username={receiver || dialog.members[0]}
+          size="large"
+          avatarId={receiverProfile?.avatar_id}
+          avatarDataUrl={receiverProfile?.avatar_data_url}
+        />
         <div className="conversation-title">
-          <h2>{receiver || dialog.members.join(", ")}</h2>
+          <h2>{receiverName || dialog.members.join(", ")}</h2>
           <p>
             <span className="online-dot" />
             Защищенный диалог

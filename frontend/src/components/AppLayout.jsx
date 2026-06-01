@@ -5,13 +5,19 @@ import {
   MessageCircle,
   RefreshCw,
   Search,
+  Settings as SettingsIcon,
   ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
 
 import { Avatar } from "./Avatar.jsx";
-import { formatDateTime, getDialogReceiver } from "../lib/format.js";
+import {
+  formatDateTime,
+  getDialogReceiver,
+  getDialogReceiverProfile,
+  getUserDisplayName,
+} from "../lib/format.js";
 
 export function AppLayout({
   me,
@@ -111,7 +117,9 @@ export function AppLayout({
             </div>
           ) : (
             visibleDialogs.map((dialog) => {
+              const receiverProfile = getDialogReceiverProfile(dialog, me.username);
               const receiver = getDialogReceiver(dialog, me.username);
+              const receiverName = getUserDisplayName(receiverProfile) || receiver;
               const isActive = dialog.id === activeDialogId;
 
               return (
@@ -121,11 +129,16 @@ export function AppLayout({
                   type="button"
                   onClick={() => navigate(`/dialogs/${dialog.id}`)}
                 >
-                  <Avatar username={receiver || dialog.members[0]} size="small" />
+                  <Avatar
+                    username={receiver || dialog.members[0]}
+                    size="small"
+                    avatarId={receiverProfile?.avatar_id}
+                    avatarDataUrl={receiverProfile?.avatar_data_url}
+                  />
                   <span className="dialog-main">
                     <span className="dialog-row">
                       <span className="dialog-members">
-                        {receiver || dialog.members.join(", ")}
+                        {receiverName || dialog.members.join(", ")}
                       </span>
                       <span className="dialog-time">
                         {formatDateTime(dialog.created_at)}
@@ -154,12 +167,25 @@ export function AppLayout({
         </section>
 
         <footer className="account-strip">
-          <Avatar username={me.username} size="tiny" online />
-          <span>{me.username}</span>
+          <Avatar
+            username={me.username}
+            size="tiny"
+            avatarId={me.avatar_id}
+            avatarDataUrl={me.avatar_data_url}
+          />
+          <span className="account-name">{getUserDisplayName(me)}</span>
+          <button
+            className="icon-link"
+            type="button"
+            title="Настройки"
+            onClick={() => navigate("/settings")}
+          >
+            <SettingsIcon size={17} aria-hidden="true" />
+          </button>
           <button className="icon-link" type="button" title="Выйти" onClick={onLogout}>
             <LogOut size={17} aria-hidden="true" />
           </button>
-          <ChevronDown size={17} aria-hidden="true" />
+          <ChevronDown className="account-chevron" size={17} aria-hidden="true" />
         </footer>
       </aside>
 

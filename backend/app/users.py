@@ -53,7 +53,10 @@ def search_users(
             id=user.id,
             username=user.username,
             display_name=user.display_name,
-            has_public_key=has_public_key(db_session, user.id),
+            avatar_id=user.avatar_id,
+            avatar_data_url=user.avatar_data_url,
+            has_public_key=True,
         )
         for user in users
+        if has_public_key(db_session, user.id)
     ]
