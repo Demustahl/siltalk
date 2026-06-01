@@ -20,15 +20,15 @@ SilTalk — мессенджер с E2EE (end-to-end encryption).
 - Docker Compose
 
 ### Frontend
-- React + TypeScript (PWA)
+- React + Vite
 - WebSocket (realtime)
-- IndexedDB (локальное хранилище)
-- E2EE: libsignal (или другой подход на базе libsodium/WebCrypto — уточняется)
+- E2EE: libsodium
+- локальный приватный ключ хранится только в браузере
 
 ## Структура
 
 - `backend/` — backend на Python и FastAPI
-- `frontend/` — будущий клиент
+- `frontend/` — React-клиент
 - `infra/` — инфраструктурные файлы и локальный запуск
 
 ## Локальный запуск backend
@@ -41,6 +41,16 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
+## Локальный запуск frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+По умолчанию frontend открывается на `http://127.0.0.1:5173`.
+
 ## Проверки
 
 ```bash
@@ -48,4 +58,9 @@ cd backend
 uv run pytest
 uv run ruff check .
 uv run mypy app
+```
+
+```bash
+cd frontend
+npm run build
 ```
