@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Generator
 
 import httpx
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -10,7 +10,7 @@ from app.auth import create_access_token, hash_password
 from app.database import Base, get_db_session
 from app.main import app
 from app.messages import save_direct_message
-from app.models import Message, User
+from app.models import Message, MessageDeliveryStatus, User
 
 
 class DialogsTestClient:
@@ -85,6 +85,11 @@ class DialogsTestClient:
 
             return message
 
+    # Возвращает статусы сообщений из тестовой БД
+    def get_delivery_statuses(self) -> list[MessageDeliveryStatus]:
+        with self.session_local() as db_session:
+            return list(db_session.scalars(select(MessageDeliveryStatus)).all())
+
 
 def test_read_dialogs_returns_only_current_user_dialogs() -> None:
     async def run_test() -> None:
@@ -106,6 +111,7 @@ def test_read_dialogs_returns_only_current_user_dialogs() -> None:
             assert len(response_data) == 1
             assert response_data[0]["dialog_type"] == "direct"
             assert set(response_data[0]["members"]) == {"user1", "user2"}
+            assert response_data[0]["unread_count"] == 0
 
     asyncio.run(run_test())
 
@@ -134,6 +140,74 @@ def test_read_dialog_messages_returns_history_for_member() -> None:
                 "user1",
                 "user2",
             ]
+            assert [message["status"] for message in response_data] == [
+                "sent",
+                "sent",
+            ]
+
+    asyncio.run(run_test())
+
+
+def test_saved_message_creates_sent_delivery_status() -> None:
+    async def run_test() -> None:
+        async with DialogsTestClient() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+
+            message = test_app.save_message(user1, "user2", "ciphertext-hello")
+
+            statuses = test_app.get_delivery_statuses()
+            assert len(statuses) == 1
+            assert statuses[0].message_id == message.id
+            assert statuses[0].user_id == user2.id
+            assert statuses[0].status == "sent"
+
+    asyncio.run(run_test())
+
+
+def test_read_dialogs_returns_unread_count_and_read_endpoint_clears_it() -> None:
+    async def run_test() -> None:
+        async with DialogsTestClient() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+
+            message = test_app.save_message(user1, "user2", "ciphertext-hello")
+
+            unread_response = await test_app.client.get(
+                "/dialogs",
+                headers=test_app.auth_headers(user2),
+            )
+
+            assert unread_response.status_code == 200
+            assert unread_response.json()[0]["id"] == str(message.dialog_id)
+            assert unread_response.json()[0]["unread_count"] == 1
+
+            read_response = await test_app.client.post(
+                f"/dialogs/{message.dialog_id}/read",
+                headers=test_app.auth_headers(user2),
+            )
+
+            assert read_response.status_code == 200
+            assert read_response.json() == {
+                "dialog_id": str(message.dialog_id),
+                "marked_read_count": 1,
+            }
+
+            read_again_response = await test_app.client.get(
+                "/dialogs",
+                headers=test_app.auth_headers(user2),
+            )
+
+            assert read_again_response.status_code == 200
+            assert read_again_response.json()[0]["unread_count"] == 0
+
+            history_response = await test_app.client.get(
+                f"/dialogs/{message.dialog_id}/messages",
+                headers=test_app.auth_headers(user1),
+            )
+
+            assert history_response.status_code == 200
+            assert history_response.json()[0]["status"] == "read"
 
     asyncio.run(run_test())
 

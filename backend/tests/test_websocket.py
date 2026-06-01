@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth import create_access_token, hash_password
 from app.database import Base, get_db_session
 from app.main import app
-from app.models import DialogMember, Message, User
+from app.models import DialogMember, Message, MessageDeliveryStatus, User
 from app.realtime import manager
 
 
@@ -72,6 +72,11 @@ class WebSocketTestApp:
         with self.session_local() as db_session:
             return list(db_session.scalars(select(Message)).all())
 
+    # Возвращает статусы доставки сообщений
+    def get_delivery_statuses(self) -> list[MessageDeliveryStatus]:
+        with self.session_local() as db_session:
+            return list(db_session.scalars(select(MessageDeliveryStatus)).all())
+
     # Возвращает usernames участников диалога
     def get_dialog_member_usernames(self, dialog_id: uuid.UUID) -> set[str]:
         with self.session_local() as db_session:
@@ -126,7 +131,7 @@ class WebSocketSession:
     async def send_json(self, data: dict[str, str]) -> None:
         await self.send_text(json.dumps(data))
 
-    async def receive_json(self) -> dict[str, str]:
+    async def receive_json(self) -> dict[str, Any]:
         message = await asyncio.wait_for(self.from_app.get(), timeout=1)
         assert message["type"] == "websocket.send"
 
@@ -176,11 +181,20 @@ def test_websocket_sends_message_to_other_client() -> None:
                     }
                 )
 
-                assert await user2.receive_json() == {
-                    "type": "message",
-                    "from": "user1",
-                    "ciphertext": "ciphertext-hello",
-                }
+                first_receiver_message = await user2.receive_json()
+                assert first_receiver_message["type"] == "message"
+                assert first_receiver_message["from"] == "user1"
+                assert first_receiver_message["ciphertext"] == "ciphertext-hello"
+                assert first_receiver_message["status"] == "delivered"
+                assert first_receiver_message["id"]
+                assert first_receiver_message["dialog_id"]
+
+                first_sender_status = await user1.receive_json()
+                assert first_sender_status["type"] == "message_status"
+                assert first_sender_status["to"] == "user2"
+                assert first_sender_status["status"] == "delivered"
+                assert first_sender_status["saved"] is True
+                assert first_sender_status["delivered"] is True
 
                 await user1.send_json(
                     {
@@ -190,11 +204,15 @@ def test_websocket_sends_message_to_other_client() -> None:
                     }
                 )
 
-                assert await user2.receive_json() == {
-                    "type": "message",
-                    "from": "user1",
-                    "ciphertext": "ciphertext-second",
-                }
+                second_receiver_message = await user2.receive_json()
+                assert second_receiver_message["type"] == "message"
+                assert second_receiver_message["from"] == "user1"
+                assert second_receiver_message["ciphertext"] == "ciphertext-second"
+                assert second_receiver_message["status"] == "delivered"
+
+                second_sender_status = await user1.receive_json()
+                assert second_sender_status["type"] == "message_status"
+                assert second_sender_status["status"] == "delivered"
 
             saved_messages = test_app.get_messages()
             assert len(saved_messages) == 2
@@ -206,6 +224,10 @@ def test_websocket_sends_message_to_other_client() -> None:
             assert test_app.get_dialog_member_usernames(
                 saved_messages[0].dialog_id
             ) == {"user1", "user2"}
+
+            delivery_statuses = test_app.get_delivery_statuses()
+            assert len(delivery_statuses) == 2
+            assert {status.status for status in delivery_statuses} == {"delivered"}
 
     asyncio.run(run_test())
 
@@ -247,7 +269,7 @@ def test_websocket_rejects_message_without_ciphertext() -> None:
     asyncio.run(run_test())
 
 
-def test_websocket_returns_error_when_receiver_is_offline() -> None:
+def test_websocket_confirms_saved_message_when_receiver_is_offline() -> None:
     async def run_test() -> None:
         async with WebSocketTestApp() as test_app:
             user1_token = test_app.create_token("user1")
@@ -262,14 +284,21 @@ def test_websocket_returns_error_when_receiver_is_offline() -> None:
                     }
                 )
 
-                assert await websocket.receive_json() == {
-                    "type": "error",
-                    "text": "Получатель не подключен",
-                }
+                sender_status = await websocket.receive_json()
+                assert sender_status["type"] == "message_status"
+                assert sender_status["to"] == "user2"
+                assert sender_status["status"] == "sent"
+                assert sender_status["saved"] is True
+                assert sender_status["delivered"] is False
+                assert sender_status["recipient_online"] is False
 
             saved_messages = test_app.get_messages()
             assert len(saved_messages) == 1
             assert saved_messages[0].ciphertext == "ciphertext-hello"
+
+            delivery_statuses = test_app.get_delivery_statuses()
+            assert len(delivery_statuses) == 1
+            assert delivery_statuses[0].status == "sent"
 
     asyncio.run(run_test())
 

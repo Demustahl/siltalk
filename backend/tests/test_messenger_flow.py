@@ -106,11 +106,20 @@ def send_message_over_websocket(
             }
         )
 
-        assert receiver_socket.receive_json() == {
-            "type": "message",
-            "from": "maksim",
-            "ciphertext": ciphertext,
-        }
+        receiver_message = receiver_socket.receive_json()
+        assert receiver_message["type"] == "message"
+        assert receiver_message["from"] == "maksim"
+        assert receiver_message["ciphertext"] == ciphertext
+        assert receiver_message["status"] == "delivered"
+        assert receiver_message["id"]
+        assert receiver_message["dialog_id"]
+
+        sender_status = sender_socket.receive_json()
+        assert sender_status["type"] == "message_status"
+        assert sender_status["to"] == receiver_username
+        assert sender_status["status"] == "delivered"
+        assert sender_status["saved"] is True
+        assert sender_status["delivered"] is True
 
 
 def test_messenger_flow_register_login_send_and_read_history() -> None:
@@ -152,6 +161,7 @@ def test_messenger_flow_register_login_send_and_read_history() -> None:
         assert dialogs[0]["id"] == str(dialog_id)
         assert dialogs[0]["dialog_type"] == "direct"
         assert set(dialogs[0]["members"]) == {"maksim", "dima"}
+        assert dialogs[0]["unread_count"] == 0
 
         history_response = client.get(
             f"/dialogs/{dialog_id}/messages",
@@ -164,6 +174,7 @@ def test_messenger_flow_register_login_send_and_read_history() -> None:
         assert history[0]["dialog_id"] == str(dialog_id)
         assert history[0]["sender_username"] == "maksim"
         assert history[0]["ciphertext"] == "ciphertext-envelope"
+        assert history[0]["status"] == "delivered"
 
         stranger_response = client.get(
             f"/dialogs/{dialog_id}/messages",

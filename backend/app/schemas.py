@@ -44,6 +44,7 @@ class DialogRead(BaseModel):
     dialog_type: str
     title: str | None
     members: list[str]
+    unread_count: int
     created_at: datetime
 
 
@@ -53,4 +54,17 @@ class MessageRead(BaseModel):
     sender_user_id: uuid.UUID
     sender_username: str
     ciphertext: str
+    status: str
     created_at: datetime
+
+
+class DialogReadMark(BaseModel):
+    dialog_id: uuid.UUID
+    marked_read_count: int
+
+
+class UserSearchRead(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str | None
+    has_public_key: bool

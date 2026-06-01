@@ -4,9 +4,14 @@ from typing import Any
 from fastapi import Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.auth import get_user_from_token
+from app.auth import get_user_from_token, normalize_username
 from app.database import get_db_session
-from app.messages import save_direct_message
+from app.messages import (
+    MESSAGE_STATUS_DELIVERED,
+    MESSAGE_STATUS_SENT,
+    mark_message_delivered,
+    save_direct_message,
+)
 
 
 class ConnectionManager:
@@ -21,15 +26,21 @@ class ConnectionManager:
         if self.active_connections.get(client_id) is websocket:
             del self.active_connections[client_id]
 
-    async def send_to_client(self, client_id: str, message: dict[str, str]) -> bool:
+    async def send_to_client(self, client_id: str, message: dict[str, Any]) -> bool:
         websocket = self.active_connections.get(client_id)
         if websocket is None:
             return False
 
-        await websocket.send_json(message)
+        try:
+            await websocket.send_json(message)
+        except (RuntimeError, WebSocketDisconnect):
+            if self.active_connections.get(client_id) is websocket:
+                del self.active_connections[client_id]
+            return False
+
         return True
 
-    async def send_to_all(self, message: dict[str, str]) -> None:
+    async def send_to_all(self, message: dict[str, Any]) -> None:
         for websocket in self.active_connections.values():
             await websocket.send_json(message)
 
@@ -73,10 +84,11 @@ async def websocket_chat(
                 )
                 continue
 
+            receiver_username = normalize_username(message["to"])
             saved_message = save_direct_message(
                 db_session,
                 user,
-                message["to"],
+                receiver_username,
                 message["ciphertext"],
             )
             if saved_message is None:
@@ -85,18 +97,42 @@ async def websocket_chat(
                 )
                 continue
 
-            is_sent = await manager.send_to_client(
-                message["to"],
+            is_delivered = await manager.send_to_client(
+                receiver_username,
                 {
                     "type": "message",
+                    "id": str(saved_message.id),
+                    "dialog_id": str(saved_message.dialog_id),
                     "from": client_id,
+                    "sender_user_id": str(user.id),
                     "ciphertext": message["ciphertext"],
+                    "status": MESSAGE_STATUS_DELIVERED,
+                    "created_at": saved_message.created_at.isoformat(),
                 },
             )
-            if not is_sent:
-                await websocket.send_json(
-                    {"type": "error", "text": "Получатель не подключен"}
+
+            message_status = MESSAGE_STATUS_SENT
+            if is_delivered:
+                mark_message_delivered(
+                    db_session,
+                    saved_message.id,
+                    receiver_username,
                 )
+                message_status = MESSAGE_STATUS_DELIVERED
+
+            await websocket.send_json(
+                {
+                    "type": "message_status",
+                    "message_id": str(saved_message.id),
+                    "dialog_id": str(saved_message.dialog_id),
+                    "to": receiver_username,
+                    "status": message_status,
+                    "saved": True,
+                    "delivered": is_delivered,
+                    "recipient_online": is_delivered,
+                    "created_at": saved_message.created_at.isoformat(),
+                }
+            )
     except WebSocketDisconnect:
         manager.disconnect(client_id, websocket)
 
