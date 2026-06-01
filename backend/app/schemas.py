@@ -75,6 +75,12 @@ class MessageRead(BaseModel):
     created_at: datetime
 
 
+class AttachmentRead(BaseModel):
+    id: uuid.UUID
+    encrypted_size: int
+    created_at: datetime
+
+
 class DialogReadMark(BaseModel):
     dialog_id: uuid.UUID
     marked_read_count: int

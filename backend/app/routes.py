@@ -1,5 +1,6 @@
 from fastapi import FastAPI, status
 
+from app.attachments import download_attachment, upload_attachment
 from app.auth import (
     login_user,
     read_current_user,
@@ -10,6 +11,7 @@ from app.dialogs import mark_dialog_messages_read, read_dialog_messages, read_di
 from app.keys import publish_my_public_key, read_user_public_key
 from app.realtime import websocket_chat
 from app.schemas import (
+    AttachmentRead,
     DialogRead,
     DialogReadMark,
     MessageRead,
@@ -84,6 +86,20 @@ def register_routes(app: FastAPI) -> None:
         methods=["GET"],
         response_model=list[UserSearchRead],
         tags=["users"],
+    )
+    app.add_api_route(
+        "/attachments",
+        upload_attachment,
+        methods=["POST"],
+        response_model=AttachmentRead,
+        status_code=status.HTTP_201_CREATED,
+        tags=["attachments"],
+    )
+    app.add_api_route(
+        "/attachments/{attachment_id}",
+        download_attachment,
+        methods=["GET"],
+        tags=["attachments"],
     )
 
     app.add_api_route(

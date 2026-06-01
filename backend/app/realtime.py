@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Any
 
 from fastapi import Depends, WebSocket, WebSocketDisconnect
@@ -48,7 +49,6 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# Обрабатывает WebSocket-подключение пользователя с access-токеном
 async def websocket_chat(
     websocket: WebSocket,
     db_session: Session = Depends(get_db_session),
@@ -70,7 +70,6 @@ async def websocket_chat(
         return
 
     client_id = user.username
-
     await manager.connect(client_id, websocket)
 
     try:
@@ -80,23 +79,34 @@ async def websocket_chat(
 
             if message is None:
                 await websocket.send_json(
-                    {"type": "error", "text": "Некорректный JSON или формат сообщения"}
+                    {
+                        "type": "error",
+                        "text": "Некорректный JSON или формат сообщения",
+                    }
                 )
                 continue
 
             receiver_username = normalize_username(message["to"])
+            attachment_ids = message["attachment_ids"]
             saved_message = save_direct_message(
                 db_session,
                 user,
                 receiver_username,
                 message["ciphertext"],
+                attachment_ids,
             )
             if saved_message is None:
-                await websocket.send_json(
-                    {"type": "error", "text": "Получатель не найден"}
+                error_text = (
+                    "Получатель не найден"
+                    if not attachment_ids
+                    else "Получатель не найден или вложение недоступно"
                 )
+                await websocket.send_json({"type": "error", "text": error_text})
                 continue
 
+            attachment_id_strings = [
+                str(attachment_id) for attachment_id in attachment_ids
+            ]
             is_delivered = await manager.send_to_client(
                 receiver_username,
                 {
@@ -106,6 +116,7 @@ async def websocket_chat(
                     "from": client_id,
                     "sender_user_id": str(user.id),
                     "ciphertext": message["ciphertext"],
+                    "attachment_ids": attachment_id_strings,
                     "status": MESSAGE_STATUS_DELIVERED,
                     "created_at": saved_message.created_at.isoformat(),
                 },
@@ -130,6 +141,7 @@ async def websocket_chat(
                     "saved": True,
                     "delivered": is_delivered,
                     "recipient_online": is_delivered,
+                    "attachment_ids": attachment_id_strings,
                     "created_at": saved_message.created_at.isoformat(),
                 }
             )
@@ -137,8 +149,7 @@ async def websocket_chat(
         manager.disconnect(client_id, websocket)
 
 
-# Проверяет входящее сообщение из WebSocket
-def parse_message(raw_message: str) -> dict[str, str] | None:
+def parse_message(raw_message: str) -> dict[str, Any] | None:
     try:
         message: Any = json.loads(raw_message)
     except json.JSONDecodeError:
@@ -150,6 +161,7 @@ def parse_message(raw_message: str) -> dict[str, str] | None:
     message_type = message.get("type")
     to_client = message.get("to")
     ciphertext = message.get("ciphertext")
+    attachment_ids_raw = message.get("attachment_ids", [])
 
     if message_type != "message":
         return None
@@ -157,5 +169,21 @@ def parse_message(raw_message: str) -> dict[str, str] | None:
         return None
     if not isinstance(ciphertext, str) or not ciphertext:
         return None
+    if not isinstance(attachment_ids_raw, list) or len(attachment_ids_raw) > 5:
+        return None
 
-    return {"type": message_type, "to": to_client, "ciphertext": ciphertext}
+    attachment_ids: list[uuid.UUID] = []
+    for attachment_id_raw in attachment_ids_raw:
+        if not isinstance(attachment_id_raw, str):
+            return None
+        try:
+            attachment_ids.append(uuid.UUID(attachment_id_raw))
+        except ValueError:
+            return None
+
+    return {
+        "type": message_type,
+        "to": to_client,
+        "ciphertext": ciphertext,
+        "attachment_ids": attachment_ids,
+    }

@@ -1,5 +1,4 @@
 import {
-  ChevronDown,
   LogOut,
   PenLine,
   MessageCircle,
@@ -7,7 +6,6 @@ import {
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
-  SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -67,7 +65,6 @@ export function AppLayout({
         >
           <Search size={19} aria-hidden="true" />
           <span>Поиск пользователя</span>
-          <SlidersHorizontal size={18} aria-hidden="true" />
         </button>
 
         <nav className="chat-tabs" aria-label="Фильтры диалогов">
@@ -185,7 +182,6 @@ export function AppLayout({
           <button className="icon-link" type="button" title="Выйти" onClick={onLogout}>
             <LogOut size={17} aria-hidden="true" />
           </button>
-          <ChevronDown className="account-chevron" size={17} aria-hidden="true" />
         </footer>
       </aside>
 

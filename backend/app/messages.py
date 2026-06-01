@@ -4,7 +4,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import normalize_username
-from app.models import Dialog, DialogMember, Message, MessageDeliveryStatus, User
+from app.models import (
+    Dialog,
+    DialogMember,
+    Message,
+    MessageAttachment,
+    MessageDeliveryStatus,
+    User,
+)
 
 MESSAGE_STATUS_SENT = "sent"
 MESSAGE_STATUS_DELIVERED = "delivered"
@@ -14,6 +21,7 @@ MESSAGE_STATUS_ORDER = {
     MESSAGE_STATUS_DELIVERED: 2,
     MESSAGE_STATUS_READ: 3,
 }
+MAX_MESSAGE_ATTACHMENTS = 5
 
 
 # Ищет прямой диалог двух пользователей
@@ -109,11 +117,46 @@ def mark_message_delivered(
 
 
 # Сохраняет сообщение в прямом диалоге
+def link_message_attachments(
+    db_session: Session,
+    message: Message,
+    sender: User,
+    attachment_ids: list[uuid.UUID],
+) -> bool:
+    unique_attachment_ids = list(dict.fromkeys(attachment_ids))
+    if len(unique_attachment_ids) > MAX_MESSAGE_ATTACHMENTS:
+        return False
+    if not unique_attachment_ids:
+        return True
+
+    attachments = list(
+        db_session.scalars(
+            select(MessageAttachment).where(
+                MessageAttachment.id.in_(unique_attachment_ids)
+            )
+        ).all()
+    )
+    if len(attachments) != len(unique_attachment_ids):
+        return False
+
+    for attachment in attachments:
+        if attachment.uploader_user_id != sender.id:
+            return False
+        if attachment.message_id is not None:
+            return False
+
+    for attachment in attachments:
+        attachment.message_id = message.id
+
+    return True
+
+
 def save_direct_message(
     db_session: Session,
     sender: User,
     receiver_username: str,
     ciphertext: str,
+    attachment_ids: list[uuid.UUID] | None = None,
 ) -> Message | None:
     username = normalize_username(receiver_username)
     receiver = db_session.scalar(select(User).where(User.username == username))
@@ -130,6 +173,10 @@ def save_direct_message(
     )
     db_session.add(message)
     db_session.flush()
+
+    if not link_message_attachments(db_session, message, sender, attachment_ids or []):
+        db_session.rollback()
+        return None
 
     db_session.add(
         MessageDeliveryStatus(

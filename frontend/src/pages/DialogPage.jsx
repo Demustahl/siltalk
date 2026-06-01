@@ -1,16 +1,20 @@
 import {
   ArrowLeft,
-  Mic,
-  MoreHorizontal,
+  Download,
   Paperclip,
   Send,
   ShieldCheck,
-  Smile,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar } from "../components/Avatar.jsx";
-import { decryptEnvelope } from "../lib/e2ee.js";
+import {
+  filterAttachmentFiles,
+  formatFileSize,
+  prepareEncryptedAttachments,
+} from "../lib/attachments.js";
+import { decryptAttachmentBlob, decryptMessageEnvelope } from "../lib/e2ee.js";
 import {
   formatMessageDate,
   formatMessageTime,
@@ -71,10 +75,12 @@ export function DialogPage({
   const receiverName = getUserDisplayName(receiverProfile) || receiver;
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   const loadMessages = useCallback(async () => {
@@ -84,14 +90,18 @@ export function DialogPage({
     try {
       const rawMessages = await api.readMessages(dialogId);
       const decodedMessages = await Promise.all(
-        rawMessages.map(async (message) => ({
-          ...message,
-          text: await decryptEnvelope(
+        rawMessages.map(async (message) => {
+          const decryptedMessage = await decryptMessageEnvelope(
             message.ciphertext,
             me.username,
             e2ee.keyPair,
-          ),
-        })),
+          );
+
+          return {
+            ...message,
+            ...decryptedMessage,
+          };
+        }),
       );
 
       setMessages(decodedMessages);
@@ -100,7 +110,7 @@ export function DialogPage({
         await api.markDialogRead(dialogId);
         await onRefreshDialogs();
       } catch {
-        // Старый backend мог еще не поддерживать read-ручку
+        // Старый backend мог еще не поддерживать read-ручку.
       }
     } catch (caughtError) {
       setError(caughtError.message);
@@ -160,20 +170,62 @@ export function DialogPage({
     });
   }, [deliveryStatus, dialogId]);
 
+  function handleFileSelect(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+
+    setError("");
+    setSelectedFiles((currentFiles) => {
+      const nextFiles = filterAttachmentFiles(currentFiles, files);
+      if (nextFiles.length < currentFiles.length + files.length) {
+        setError("Часть файлов пропущена: максимум 5 файлов до 10 МБ каждый");
+      }
+
+      return nextFiles;
+    });
+  }
+
+  async function handleDownloadAttachment(attachment) {
+    setError("");
+    setStatusText("Скачиваю и расшифровываю файл");
+
+    try {
+      const encryptedBuffer = await api.downloadAttachment(attachment.id);
+      const blob = await decryptAttachmentBlob(encryptedBuffer, attachment);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.name || "attachment";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setStatusText("");
+    } catch (caughtError) {
+      setStatusText("");
+      setError(caughtError.message);
+    }
+  }
+
   async function handleSend(event) {
     event.preventDefault();
     const text = messageText.trim();
-    if (!receiver || !text) {
-      setError("Нужен получатель и текст сообщения");
+    if (!receiver || (!text && selectedFiles.length === 0)) {
+      setError("Нужен получатель и текст или файл");
       return;
     }
 
     setError("");
-    setStatusText("Шифрую и отправляю");
+    setStatusText(
+      selectedFiles.length > 0
+        ? "Шифрую вложения и отправляю"
+        : "Шифрую и отправляю",
+    );
     setIsSending(true);
 
     try {
-      const delivery = await onSendMessage(receiver, text);
+      const attachments = await prepareEncryptedAttachments(api, selectedFiles);
+      const delivery = await onSendMessage(receiver, text, attachments);
       setMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -181,11 +233,13 @@ export function DialogPage({
           dialog_id: delivery.dialog_id,
           sender_username: me.username,
           text,
+          attachments,
           status: delivery.status,
           created_at: delivery.created_at,
         },
       ]);
       setMessageText("");
+      setSelectedFiles([]);
       setStatusText("");
       await onRefreshDialogs();
     } catch (caughtError) {
@@ -238,11 +292,6 @@ export function DialogPage({
             Защищенный диалог
           </p>
         </div>
-        <div className="conversation-actions">
-          <button className="icon-button glass-button" type="button" title="Меню">
-            <MoreHorizontal size={19} aria-hidden="true" />
-          </button>
-        </div>
       </header>
 
       <div className="messages-list">
@@ -273,7 +322,27 @@ export function DialogPage({
               ) : null}
 
               <article className={`message${isOwn ? " own" : ""}`}>
-                <p className="message-text">{message.text}</p>
+                {message.text ? (
+                  <p className="message-text">{message.text}</p>
+                ) : null}
+                {message.attachments?.length > 0 ? (
+                  <div className="message-attachments">
+                    {message.attachments.map((attachment) => (
+                      <button
+                        className="attachment-chip"
+                        key={attachment.id}
+                        type="button"
+                        onClick={() => handleDownloadAttachment(attachment)}
+                      >
+                        <Download size={16} aria-hidden="true" />
+                        <span>
+                          <strong>{attachment.name || "Файл"}</strong>
+                          <small>{formatFileSize(attachment.size)}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 {showFooter ? (
                   <p className="message-footer">
                     <span>{formatMessageTime(message.created_at)}</span>
@@ -291,7 +360,43 @@ export function DialogPage({
       </div>
 
       <form className="message-form" onSubmit={handleSend}>
-        <button className="icon-button glass-button" type="button" title="Вложение">
+        {selectedFiles.length > 0 ? (
+          <div className="selected-attachments">
+            {selectedFiles.map((file, index) => (
+              <span className="selected-attachment" key={`${file.name}-${index}`}>
+                <span>
+                  <strong>{file.name}</strong>
+                  <small>{formatFileSize(file.size)}</small>
+                </span>
+                <button
+                  className="icon-link"
+                  type="button"
+                  title="Убрать файл"
+                  onClick={() => {
+                    setSelectedFiles((currentFiles) =>
+                      currentFiles.filter((_, fileIndex) => fileIndex !== index),
+                    );
+                  }}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <input
+          ref={fileInputRef}
+          className="visually-hidden"
+          type="file"
+          multiple
+          onChange={handleFileSelect}
+        />
+        <button
+          className="icon-button glass-button"
+          type="button"
+          title="Прикрепить файл"
+          onClick={() => fileInputRef.current?.click()}
+        >
           <Paperclip size={20} aria-hidden="true" />
         </button>
         <input
@@ -300,12 +405,6 @@ export function DialogPage({
           value={messageText}
           onChange={(event) => setMessageText(event.target.value)}
         />
-        <button className="icon-button glass-button" type="button" title="Эмодзи">
-          <Smile size={20} aria-hidden="true" />
-        </button>
-        <button className="icon-button glass-button" type="button" title="Голос">
-          <Mic size={20} aria-hidden="true" />
-        </button>
         <button className="send-button" type="submit" disabled={isSending}>
           <Send size={18} aria-hidden="true" />
           <span>{isSending ? "..." : "Отправить"}</span>

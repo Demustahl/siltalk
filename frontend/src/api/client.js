@@ -38,6 +38,25 @@ export function createApiClient(apiUrl, token) {
     return data;
   }
 
+  async function requestBinary(path) {
+    let response;
+    try {
+      response = await fetch(`${baseUrl}${path}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } catch {
+      throw new Error("Backend РЅРµРґРѕСЃС‚СѓРїРµРЅ РёР»Рё Р±Р°Р·Р° РґР°РЅРЅС‹С… РЅРµ Р·Р°РїСѓС‰РµРЅР°");
+    }
+
+    if (!response.ok) {
+      throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ РІР»РѕР¶РµРЅРёРµ");
+    }
+
+    return response.arrayBuffer();
+  }
+
   return {
     apiUrl: baseUrl,
 
@@ -94,6 +113,18 @@ export function createApiClient(apiUrl, token) {
 
     markDialogRead(dialogId) {
       return request(`/dialogs/${dialogId}/read`, { method: "POST" });
+    },
+
+    uploadAttachment(encryptedBytes) {
+      return request("/attachments", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: encryptedBytes,
+      });
+    },
+
+    downloadAttachment(attachmentId) {
+      return requestBinary(`/attachments/${encodeURIComponent(attachmentId)}`);
     },
   };
 }

@@ -4,7 +4,7 @@ import { createApiClient, buildWebSocketUrl, cleanApiUrl } from "./api/client.js
 import { AppLayout } from "./components/AppLayout.jsx";
 import {
   createEncryptedEnvelope,
-  decryptEnvelope,
+  decryptMessageEnvelope,
   ensureLocalKeyPair,
 } from "./lib/e2ee.js";
 import { normalizeUsername } from "./lib/format.js";
@@ -171,7 +171,7 @@ export function App() {
   }, []);
 
   const sendEncryptedMessage = useCallback(
-    async (receiverUsername, text) => {
+    async (receiverUsername, text, attachments = []) => {
       const receiver = normalizeUsername(receiverUsername);
       if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
         throw new Error("WebSocket не подключен");
@@ -183,6 +183,7 @@ export function App() {
       const receiverKey = await api.readUserPublicKey(receiver);
       const ciphertext = await createEncryptedEnvelope({
         text,
+        attachments,
         senderUsername: me.username,
         senderPublicKey: e2ee.publicKey,
         receiverUsername: receiver,
@@ -195,6 +196,7 @@ export function App() {
           type: "message",
           to: receiver,
           ciphertext,
+          attachment_ids: attachments.map((attachment) => attachment.id),
         }),
       );
 
@@ -306,10 +308,14 @@ export function App() {
       }
 
       if (data.type === "message") {
-        const text = await decryptEnvelope(data.ciphertext, me.username, e2ee.keyPair);
+        const decryptedMessage = await decryptMessageEnvelope(
+          data.ciphertext,
+          me.username,
+          e2ee.keyPair,
+        );
         setRealtimeMessage({
           ...data,
-          text,
+          ...decryptedMessage,
         });
         loadDialogs().catch(() => undefined);
       }

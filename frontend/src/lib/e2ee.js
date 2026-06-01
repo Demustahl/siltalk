@@ -78,20 +78,27 @@ function encryptForPublicKey(text, publicKey) {
 }
 
 export async function createEncryptedEnvelope({
-  text,
+  text = "",
+  attachments = [],
   senderUsername,
   senderPublicKey,
   receiverUsername,
   receiverPublicKey,
 }) {
   await ensureSodium();
+  const payload = JSON.stringify({
+    version: 2,
+    type: "siltalk.message",
+    text,
+    attachments,
+  });
 
   return JSON.stringify({
     version: 1,
     algorithm: "libsodium.crypto_box_seal",
     recipients: {
-      [receiverUsername]: encryptForPublicKey(text, receiverPublicKey),
-      [senderUsername]: encryptForPublicKey(text, senderPublicKey),
+      [receiverUsername]: encryptForPublicKey(payload, receiverPublicKey),
+      [senderUsername]: encryptForPublicKey(payload, senderPublicKey),
     },
   });
 }
@@ -120,4 +127,59 @@ export async function decryptEnvelope(ciphertext, username, keyPair) {
   } catch {
     return "Не удалось расшифровать сообщение";
   }
+}
+
+export async function decryptMessageEnvelope(ciphertext, username, keyPair) {
+  const plaintext = await decryptEnvelope(ciphertext, username, keyPair);
+
+  try {
+    const payload = JSON.parse(plaintext);
+    if (payload?.type !== "siltalk.message") {
+      return { text: plaintext, attachments: [] };
+    }
+
+    return {
+      text: typeof payload.text === "string" ? payload.text : "",
+      attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+    };
+  } catch {
+    return { text: plaintext, attachments: [] };
+  }
+}
+
+export async function encryptAttachmentFile(file) {
+  await ensureSodium();
+
+  const fileBytes = new Uint8Array(await file.arrayBuffer());
+  const key = sodium.randombytes_buf(sodium.crypto_secretbox_KEYBYTES);
+  const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+  const encryptedBytes = sodium.crypto_secretbox_easy(fileBytes, nonce, key);
+
+  return {
+    encryptedBytes,
+    metadata: {
+      version: 1,
+      algorithm: "libsodium.crypto_secretbox_easy",
+      name: file.name || "attachment",
+      mime: file.type || "application/octet-stream",
+      size: file.size,
+      key: encodeBytes(key),
+      nonce: encodeBytes(nonce),
+    },
+  };
+}
+
+export async function decryptAttachmentBlob(encryptedBuffer, attachment) {
+  await ensureSodium();
+
+  const encryptedBytes = new Uint8Array(encryptedBuffer);
+  const decryptedBytes = sodium.crypto_secretbox_open_easy(
+    encryptedBytes,
+    decodeBytes(attachment.nonce),
+    decodeBytes(attachment.key),
+  );
+
+  return new Blob([decryptedBytes], {
+    type: attachment.mime || "application/octet-stream",
+  });
 }

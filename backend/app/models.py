@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     JSON,
     String,
     Text,
@@ -161,6 +162,34 @@ class Message(Base):
         ForeignKey("user_devices.id", ondelete="SET NULL"),
     )
     ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class MessageAttachment(Base):
+    __tablename__ = "message_attachments"
+    __table_args__ = (
+        Index("ix_message_attachments_message_id", "message_id"),
+        Index("ix_message_attachments_uploader_user_id", "uploader_user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"),
+    )
+    uploader_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    storage_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    encrypted_size: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

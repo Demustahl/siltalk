@@ -12,6 +12,7 @@ EXPECTED_TABLES = {
     "dialogs",
     "dialog_members",
     "messages",
+    "message_attachments",
     "message_delivery_statuses",
     "refresh_tokens",
 }
@@ -27,6 +28,16 @@ def test_messages_store_ciphertext_without_plaintext() -> None:
     assert "ciphertext" in columns
     assert "plaintext" not in columns
     assert "text" not in columns
+
+
+def test_attachments_store_only_encrypted_file_metadata() -> None:
+    columns = set(Base.metadata.tables["message_attachments"].columns.keys())
+
+    assert "storage_key" in columns
+    assert "encrypted_size" in columns
+    assert "filename" not in columns
+    assert "mime_type" not in columns
+    assert "plaintext" not in columns
 
 
 def test_users_store_password_hash_without_plain_password() -> None:

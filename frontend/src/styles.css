@@ -275,7 +275,7 @@ h2 {
 
 .search-trigger {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   width: 100%;
   min-height: 48px;
   border: 1px solid var(--line);
@@ -400,11 +400,6 @@ h2 {
   height: 9px;
   border-radius: 999px;
   background: var(--success);
-}
-
-.conversation-actions {
-  display: flex;
-  gap: 10px;
 }
 
 .header-back {
@@ -617,10 +612,6 @@ h2 {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.account-chevron {
-  color: var(--muted);
 }
 
 .dialog-grid {
@@ -954,6 +945,54 @@ h2 {
   text-align: right;
 }
 
+.message-attachments {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.message-text + .message-attachments {
+  margin-top: 10px;
+}
+
+.attachment-chip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
+  width: min(330px, 100%);
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 9px 11px;
+  color: var(--text);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.attachment-chip svg {
+  color: var(--primary);
+}
+
+.attachment-chip span,
+.selected-attachment > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.attachment-chip strong,
+.selected-attachment strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-chip small,
+.selected-attachment small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .date-divider {
   display: flex;
   justify-content: center;
@@ -971,11 +1010,30 @@ h2 {
 
 .message-form {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   border-top: 1px solid var(--line);
   padding: 18px 28px;
   background: rgba(11, 18, 24, 0.94);
+}
+
+.selected-attachments {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selected-attachment {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px 8px 8px 12px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .message-form input {
@@ -1029,14 +1087,6 @@ h2 {
     grid-template-columns: 320px minmax(0, 1fr);
   }
 
-  .message-form {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .message-form .glass-button[title="Эмодзи"],
-  .message-form .glass-button[title="Голос"] {
-    display: none;
-  }
 }
 
 @media (max-width: 760px) {
@@ -1108,10 +1158,6 @@ h2 {
 
   .conversation-header {
     gap: 10px;
-  }
-
-  .conversation-actions {
-    display: none;
   }
 
   .message {
