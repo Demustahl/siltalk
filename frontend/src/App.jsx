@@ -41,6 +41,34 @@ function readRoute() {
   return { name: "dialogs" };
 }
 
+async function decryptDialogPreviews(rawDialogs, currentUser, e2eeData) {
+  if (!currentUser || !e2eeData) {
+    return rawDialogs;
+  }
+
+  return Promise.all(
+    rawDialogs.map(async (dialog) => {
+      if (!dialog.last_message?.ciphertext) {
+        return dialog;
+      }
+
+      const decryptedMessage = await decryptMessageEnvelope(
+        dialog.last_message.ciphertext,
+        currentUser.username,
+        e2eeData.keyPair,
+      );
+
+      return {
+        ...dialog,
+        last_message: {
+          ...dialog.last_message,
+          ...decryptedMessage,
+        },
+      };
+    }),
+  );
+}
+
 export function App() {
   const [route, setRoute] = useState(readRoute);
   const [token, setToken] = useState(localStorage.getItem("accessToken") || "");
@@ -87,10 +115,11 @@ export function App() {
       return [];
     }
 
-    const nextDialogs = await api.readDialogs();
+    const rawDialogs = await api.readDialogs();
+    const nextDialogs = await decryptDialogPreviews(rawDialogs, me, e2ee);
     setDialogs(nextDialogs);
     return nextDialogs;
-  }, [api, token]);
+  }, [api, e2ee, me, token]);
 
   const finishLogin = useCallback(
     async (nextToken) => {
@@ -290,7 +319,12 @@ export function App() {
         const currentUser = await api.me();
         const keys = await ensureLocalKeyPair(currentUser.username);
         await api.publishPublicKey(keys.publicKey);
-        const nextDialogs = await api.readDialogs();
+        const rawDialogs = await api.readDialogs();
+        const nextDialogs = await decryptDialogPreviews(
+          rawDialogs,
+          currentUser,
+          keys,
+        );
 
         if (!isCancelled) {
           setMe(currentUser);

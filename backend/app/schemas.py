@@ -55,6 +55,13 @@ class PublicKeyRead(BaseModel):
     updated_at: datetime
 
 
+class DialogLastMessageRead(BaseModel):
+    id: uuid.UUID
+    sender_username: str
+    ciphertext: str
+    created_at: datetime
+
+
 class DialogRead(BaseModel):
     id: uuid.UUID
     dialog_type: str
@@ -62,6 +69,7 @@ class DialogRead(BaseModel):
     members: list[str]
     member_profiles: list[UserPublicRead]
     unread_count: int
+    last_message: DialogLastMessageRead | None
     created_at: datetime
 
 

@@ -1,12 +1,12 @@
-import { MessageCircle, Search, ShieldCheck } from "lucide-react";
+import { MessageCircle, Search } from "lucide-react";
 
 import { Avatar } from "../components/Avatar.jsx";
 import {
-  formatDateTime,
+  formatDialogDateTime,
   getDialogDisplayName,
+  getDialogPreview,
   getDialogReceiver,
   getDialogReceiverProfile,
-  getDialogSubtitle,
   isGroupDialog,
 } from "../lib/format.js";
 
@@ -35,7 +35,7 @@ export function DialogsPage({ dialogs, me, navigate }) {
             const receiverProfile = getDialogReceiverProfile(dialog, me.username);
             const receiver = getDialogReceiver(dialog, me.username);
             const dialogName = getDialogDisplayName(dialog, me.username);
-            const dialogSubtitle = getDialogSubtitle(dialog, me.username);
+            const dialogPreview = getDialogPreview(dialog, me.username);
             const isGroup = isGroupDialog(dialog);
 
             return (
@@ -61,8 +61,10 @@ export function DialogsPage({ dialogs, me, navigate }) {
                     ) : null}
                   </span>
                   <span className="dialog-meta">
-                    <ShieldCheck size={13} aria-hidden="true" />
-                    {dialogSubtitle} · {formatDateTime(dialog.created_at)}
+                    {dialogPreview} ·{" "}
+                    {formatDialogDateTime(
+                      dialog.last_message?.created_at || dialog.created_at,
+                    )}
                   </span>
                 </span>
               </button>

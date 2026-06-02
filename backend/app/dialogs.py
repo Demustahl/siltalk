@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.realtime import manager
 from app.schemas import (
+    DialogLastMessageRead,
     DialogRead,
     DialogReadMark,
     GroupDialogCreate,
@@ -68,6 +69,30 @@ def get_dialog_member_profiles(
     ]
 
 
+def get_last_dialog_message(
+    db_session: Session,
+    dialog_id: uuid.UUID,
+) -> DialogLastMessageRead | None:
+    statement = (
+        select(Message, User.username)
+        .join(User, User.id == Message.sender_user_id)
+        .where(Message.dialog_id == dialog_id)
+        .order_by(Message.created_at.desc())
+        .limit(1)
+    )
+    row = db_session.execute(statement).first()
+    if row is None:
+        return None
+
+    message, sender_username = row
+    return DialogLastMessageRead(
+        id=message.id,
+        sender_username=sender_username,
+        ciphertext=message.ciphertext,
+        created_at=message.created_at,
+    )
+
+
 # Собирает ответ диалога с участниками и счетчиком непрочитанных сообщений
 def build_dialog_response(
     db_session: Session,
@@ -87,6 +112,7 @@ def build_dialog_response(
             dialog.id,
             current_user.id,
         ),
+        last_message=get_last_dialog_message(db_session, dialog.id),
         created_at=dialog.created_at,
     )
 
@@ -184,11 +210,18 @@ def read_dialogs(
         .order_by(Dialog.created_at.desc())
     )
     dialogs = db_session.scalars(statement).all()
-
-    return [
+    dialog_reads = [
         build_dialog_response(db_session, dialog, current_user)
         for dialog in dialogs
     ]
+
+    return sorted(
+        dialog_reads,
+        key=lambda dialog: (
+            dialog.last_message.created_at if dialog.last_message else dialog.created_at
+        ),
+        reverse=True,
+    )
 
 
 # Создает групповой диалог с пользователями, у которых есть публичные ключи

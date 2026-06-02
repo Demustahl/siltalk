@@ -179,6 +179,8 @@ def test_read_dialogs_returns_only_current_user_dialogs() -> None:
             }
             assert "password_hash" not in response_data[0]["member_profiles"][0]
             assert response_data[0]["unread_count"] == 0
+            assert response_data[0]["last_message"]["sender_username"] == "user1"
+            assert response_data[0]["last_message"]["ciphertext"] == "ciphertext-hello"
 
     asyncio.run(run_test())
 
@@ -357,6 +359,7 @@ def test_create_group_dialog_requires_public_keys_and_returns_member_keys() -> N
             assert response_data["title"] == "Project team"
             assert set(response_data["members"]) == {"user1", "user2", "user3"}
             assert response_data["unread_count"] == 0
+            assert response_data["last_message"] is None
 
             keys_response = await test_app.client.get(
                 f"/dialogs/{response_data['id']}/keys",

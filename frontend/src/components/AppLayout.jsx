@@ -11,11 +11,11 @@ import { useState } from "react";
 
 import { Avatar } from "./Avatar.jsx";
 import {
-  formatDateTime,
+  formatDialogDateTime,
   getDialogDisplayName,
+  getDialogPreview,
   getDialogReceiver,
   getDialogReceiverProfile,
-  getDialogSubtitle,
   getUserDisplayName,
   isGroupDialog,
 } from "../lib/format.js";
@@ -120,7 +120,7 @@ export function AppLayout({
               const receiverProfile = getDialogReceiverProfile(dialog, me.username);
               const receiver = getDialogReceiver(dialog, me.username);
               const dialogName = getDialogDisplayName(dialog, me.username);
-              const dialogSubtitle = getDialogSubtitle(dialog, me.username);
+              const dialogPreview = getDialogPreview(dialog, me.username);
               const isGroup = isGroupDialog(dialog);
               const isActive = dialog.id === activeDialogId;
 
@@ -143,12 +143,13 @@ export function AppLayout({
                         {dialogName || dialog.members.join(", ")}
                       </span>
                       <span className="dialog-time">
-                        {formatDateTime(dialog.created_at)}
+                        {formatDialogDateTime(
+                          dialog.last_message?.created_at || dialog.created_at,
+                        )}
                       </span>
                     </span>
                     <span className="dialog-preview">
-                      <ShieldCheck size={13} aria-hidden="true" />
-                      {dialogSubtitle}
+                      {dialogPreview}
                     </span>
                   </span>
                   {dialog.unread_count > 0 ? (
@@ -160,14 +161,6 @@ export function AppLayout({
           )}
         </div>
 
-        <section className="security-card">
-          <ShieldCheck size={34} aria-hidden="true" />
-          <div>
-            <h2>E2EE включено</h2>
-            <p>Сообщения шифруются на вашем устройстве.</p>
-          </div>
-        </section>
-
         <footer className="account-strip">
           <Avatar
             username={me.username}
@@ -176,17 +169,19 @@ export function AppLayout({
             avatarDataUrl={me.avatar_data_url}
           />
           <span className="account-name">{getUserDisplayName(me)}</span>
-          <button
-            className="icon-link"
-            type="button"
-            title="Настройки"
-            onClick={() => navigate("/settings")}
-          >
-            <SettingsIcon size={17} aria-hidden="true" />
-          </button>
-          <button className="icon-link" type="button" title="Выйти" onClick={onLogout}>
-            <LogOut size={17} aria-hidden="true" />
-          </button>
+          <span className="account-actions">
+            <button
+              className="icon-link"
+              type="button"
+              title="Настройки"
+              onClick={() => navigate("/settings")}
+            >
+              <SettingsIcon size={17} aria-hidden="true" />
+            </button>
+            <button className="icon-link" type="button" title="Выйти" onClick={onLogout}>
+              <LogOut size={17} aria-hidden="true" />
+            </button>
+          </span>
         </footer>
       </aside>
 

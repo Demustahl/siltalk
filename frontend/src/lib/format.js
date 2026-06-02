@@ -54,12 +54,59 @@ export function getDialogSubtitle(dialog, currentUsername) {
   return `${memberCount} участников`;
 }
 
+function getAttachmentPreview(attachments = []) {
+  if (attachments.length === 0) {
+    return "";
+  }
+  if (attachments.length === 1) {
+    return attachments[0]?.name ? `Файл: ${attachments[0].name}` : "Файл";
+  }
+
+  return `Файлы: ${attachments.length}`;
+}
+
+export function getDialogPreview(dialog, currentUsername) {
+  const lastMessage = dialog?.last_message;
+  if (!lastMessage) {
+    return getDialogSubtitle(dialog, currentUsername);
+  }
+
+  const content =
+    lastMessage.text?.trim() || getAttachmentPreview(lastMessage.attachments);
+  if (!content) {
+    return "Зашифрованное сообщение";
+  }
+
+  if (lastMessage.sender_username === currentUsername) {
+    return `Вы: ${content}`;
+  }
+  if (isGroupDialog(dialog)) {
+    return `${lastMessage.sender_username}: ${content}`;
+  }
+
+  return content;
+}
+
 export function formatDateTime(value) {
   if (!value) {
     return "";
   }
 
   return new Date(value).toLocaleString();
+}
+
+export function formatDialogDateTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function getDateKey(value) {
