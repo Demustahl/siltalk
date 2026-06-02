@@ -151,6 +151,94 @@ def link_message_attachments(
     return True
 
 
+def get_dialog_recipient_users(
+    db_session: Session,
+    dialog_id: uuid.UUID,
+    sender_id: uuid.UUID,
+) -> list[User]:
+    statement = (
+        select(User)
+        .join(DialogMember, DialogMember.user_id == User.id)
+        .where(
+            DialogMember.dialog_id == dialog_id,
+            User.id != sender_id,
+        )
+        .order_by(User.username.asc())
+    )
+
+    return list(db_session.scalars(statement).all())
+
+
+def create_message_in_dialog(
+    db_session: Session,
+    dialog: Dialog,
+    sender: User,
+    recipient_users: list[User],
+    ciphertext: str,
+    attachment_ids: list[uuid.UUID] | None = None,
+) -> Message | None:
+    message = Message(
+        dialog_id=dialog.id,
+        sender_user_id=sender.id,
+        ciphertext=ciphertext,
+    )
+    db_session.add(message)
+    db_session.flush()
+
+    if not link_message_attachments(db_session, message, sender, attachment_ids or []):
+        db_session.rollback()
+        return None
+
+    db_session.add_all(
+        [
+            MessageDeliveryStatus(
+                message_id=message.id,
+                user_id=recipient.id,
+                status=MESSAGE_STATUS_SENT,
+            )
+            for recipient in recipient_users
+        ]
+    )
+    db_session.commit()
+    db_session.refresh(message)
+
+    return message
+
+
+def save_dialog_message(
+    db_session: Session,
+    sender: User,
+    dialog_id: uuid.UUID,
+    ciphertext: str,
+    attachment_ids: list[uuid.UUID] | None = None,
+) -> Message | None:
+    dialog = db_session.get(Dialog, dialog_id)
+    if dialog is None:
+        return None
+
+    is_member = db_session.scalar(
+        select(DialogMember).where(
+            DialogMember.dialog_id == dialog_id,
+            DialogMember.user_id == sender.id,
+        )
+    )
+    if is_member is None:
+        return None
+
+    recipient_users = get_dialog_recipient_users(db_session, dialog_id, sender.id)
+    if not recipient_users:
+        return None
+
+    return create_message_in_dialog(
+        db_session,
+        dialog,
+        sender,
+        recipient_users,
+        ciphertext,
+        attachment_ids,
+    )
+
+
 def save_direct_message(
     db_session: Session,
     sender: User,
@@ -166,26 +254,11 @@ def save_direct_message(
         return None
 
     dialog = get_or_create_direct_dialog(db_session, sender, receiver)
-    message = Message(
-        dialog_id=dialog.id,
-        sender_user_id=sender.id,
-        ciphertext=ciphertext,
+    return create_message_in_dialog(
+        db_session,
+        dialog,
+        sender,
+        [receiver],
+        ciphertext,
+        attachment_ids,
     )
-    db_session.add(message)
-    db_session.flush()
-
-    if not link_message_attachments(db_session, message, sender, attachment_ids or []):
-        db_session.rollback()
-        return None
-
-    db_session.add(
-        MessageDeliveryStatus(
-            message_id=message.id,
-            user_id=receiver.id,
-            status=MESSAGE_STATUS_SENT,
-        )
-    )
-    db_session.commit()
-    db_session.refresh(message)
-
-    return message

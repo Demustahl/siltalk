@@ -24,6 +24,36 @@ export function getUserDisplayName(user) {
   return user?.display_name || user?.username || "";
 }
 
+export function isGroupDialog(dialog) {
+  return dialog?.dialog_type === "group";
+}
+
+export function getDialogDisplayName(dialog, currentUsername) {
+  if (!dialog) {
+    return "";
+  }
+  if (isGroupDialog(dialog)) {
+    return dialog.title || dialog.members.join(", ");
+  }
+
+  const receiverProfile = getDialogReceiverProfile(dialog, currentUsername);
+  const receiver = getDialogReceiver(dialog, currentUsername);
+
+  return getUserDisplayName(receiverProfile) || receiver || dialog.members.join(", ");
+}
+
+export function getDialogSubtitle(dialog, currentUsername) {
+  if (!dialog) {
+    return "";
+  }
+  if (!isGroupDialog(dialog)) {
+    return "E2EE диалог";
+  }
+
+  const memberCount = dialog.members.length;
+  return `${memberCount} участников`;
+}
+
 export function formatDateTime(value) {
   if (!value) {
     return "";

@@ -7,7 +7,13 @@ from app.auth import (
     register_user,
     update_current_user_profile,
 )
-from app.dialogs import mark_dialog_messages_read, read_dialog_messages, read_dialogs
+from app.dialogs import (
+    create_group_dialog,
+    mark_dialog_messages_read,
+    read_dialog_messages,
+    read_dialog_public_keys,
+    read_dialogs,
+)
 from app.keys import publish_my_public_key, read_user_public_key
 from app.realtime import websocket_chat
 from app.schemas import (
@@ -107,6 +113,21 @@ def register_routes(app: FastAPI) -> None:
         read_dialogs,
         methods=["GET"],
         response_model=list[DialogRead],
+        tags=["dialogs"],
+    )
+    app.add_api_route(
+        "/dialogs/groups",
+        create_group_dialog,
+        methods=["POST"],
+        response_model=DialogRead,
+        status_code=status.HTTP_201_CREATED,
+        tags=["dialogs"],
+    )
+    app.add_api_route(
+        "/dialogs/{dialog_id}/keys",
+        read_dialog_public_keys,
+        methods=["GET"],
+        response_model=list[PublicKeyRead],
         tags=["dialogs"],
     )
     app.add_api_route(

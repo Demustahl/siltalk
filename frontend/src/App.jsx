@@ -140,9 +140,13 @@ export function App() {
   }, []);
 
   const resolvePendingStatus = useCallback((statusMessage) => {
-    const statusIndex = pendingStatusesRef.current.findIndex(
-      (item) => item.to === statusMessage.to,
-    );
+    const statusIndex = pendingStatusesRef.current.findIndex((item) => {
+      if (item.dialogId) {
+        return item.dialogId === statusMessage.dialog_id && !statusMessage.to;
+      }
+
+      return item.to === statusMessage.to;
+    });
     if (statusIndex === -1) {
       return;
     }
@@ -152,7 +156,7 @@ export function App() {
     pendingStatus.resolve(statusMessage);
   }, []);
 
-  const waitForDeliveryStatus = useCallback((receiverUsername) => {
+  const waitForDeliveryStatus = useCallback((target) => {
     return new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         pendingStatusesRef.current = pendingStatusesRef.current.filter(
@@ -162,7 +166,8 @@ export function App() {
       }, 8000);
 
       pendingStatusesRef.current.push({
-        to: receiverUsername,
+        to: target.to || "",
+        dialogId: target.dialogId || "",
         resolve,
         reject,
         timeoutId,
@@ -189,12 +194,47 @@ export function App() {
         receiverUsername: receiver,
         receiverPublicKey: receiverKey.public_key,
       });
-      const deliveryPromise = waitForDeliveryStatus(receiver);
+      const deliveryPromise = waitForDeliveryStatus({ to: receiver });
 
       socketRef.current.send(
         JSON.stringify({
           type: "message",
           to: receiver,
+          ciphertext,
+          attachment_ids: attachments.map((attachment) => attachment.id),
+        }),
+      );
+
+      return deliveryPromise;
+    },
+    [api, e2ee, me, waitForDeliveryStatus],
+  );
+
+  const sendEncryptedDialogMessage = useCallback(
+    async (dialog, text, attachments = []) => {
+      if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket не подключен");
+      }
+      if (!me || !e2ee) {
+        throw new Error("Ключи еще не готовы");
+      }
+
+      const dialogKeys = await api.readDialogPublicKeys(dialog.id);
+      const recipients = dialogKeys.map((keyData) => ({
+        username: keyData.username,
+        publicKey: keyData.public_key,
+      }));
+      const ciphertext = await createEncryptedEnvelope({
+        text,
+        attachments,
+        recipients,
+      });
+      const deliveryPromise = waitForDeliveryStatus({ dialogId: dialog.id });
+
+      socketRef.current.send(
+        JSON.stringify({
+          type: "message",
+          dialog_id: dialog.id,
           ciphertext,
           attachment_ids: attachments.map((attachment) => attachment.id),
         }),
@@ -315,6 +355,7 @@ export function App() {
         );
         setRealtimeMessage({
           ...data,
+          sender_username: data.from,
           ...decryptedMessage,
         });
         loadDialogs().catch(() => undefined);
@@ -389,6 +430,7 @@ export function App() {
           realtimeMessage={realtimeMessage}
           deliveryStatus={deliveryStatus}
           onSendMessage={sendEncryptedMessage}
+          onSendDialogMessage={sendEncryptedDialogMessage}
           onRefreshDialogs={loadDialogs}
           navigate={navigate}
         />

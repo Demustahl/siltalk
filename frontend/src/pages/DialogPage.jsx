@@ -19,9 +19,11 @@ import {
   formatMessageDate,
   formatMessageTime,
   getDateKey,
+  getDialogDisplayName,
   getDialogReceiver,
   getDialogReceiverProfile,
-  getUserDisplayName,
+  getDialogSubtitle,
+  isGroupDialog,
   messageStatusLabel,
 } from "../lib/format.js";
 
@@ -61,6 +63,7 @@ export function DialogPage({
   realtimeMessage,
   deliveryStatus,
   onSendMessage,
+  onSendDialogMessage,
   onRefreshDialogs,
   navigate,
 }) {
@@ -72,7 +75,9 @@ export function DialogPage({
     ? getDialogReceiverProfile(dialog, me.username)
     : null;
   const receiver = dialog ? getDialogReceiver(dialog, me.username) : "";
-  const receiverName = getUserDisplayName(receiverProfile) || receiver;
+  const dialogName = dialog ? getDialogDisplayName(dialog, me.username) : "";
+  const dialogSubtitle = dialog ? getDialogSubtitle(dialog, me.username) : "";
+  const isGroup = isGroupDialog(dialog);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState("");
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -210,7 +215,11 @@ export function DialogPage({
   async function handleSend(event) {
     event.preventDefault();
     const text = messageText.trim();
-    if (!receiver || (!text && selectedFiles.length === 0)) {
+    if (!dialog || (!isGroup && !receiver)) {
+      setError("Диалог не найден");
+      return;
+    }
+    if (!text && selectedFiles.length === 0) {
       setError("Нужен получатель и текст или файл");
       return;
     }
@@ -225,7 +234,9 @@ export function DialogPage({
 
     try {
       const attachments = await prepareEncryptedAttachments(api, selectedFiles);
-      const delivery = await onSendMessage(receiver, text, attachments);
+      const delivery = isGroup
+        ? await onSendDialogMessage(dialog, text, attachments)
+        : await onSendMessage(receiver, text, attachments);
       setMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -280,16 +291,16 @@ export function DialogPage({
           <ArrowLeft size={18} aria-hidden="true" />
         </button>
         <Avatar
-          username={receiver || dialog.members[0]}
+          username={isGroup ? dialogName : receiver}
           size="large"
-          avatarId={receiverProfile?.avatar_id}
-          avatarDataUrl={receiverProfile?.avatar_data_url}
+          avatarId={isGroup ? null : receiverProfile?.avatar_id}
+          avatarDataUrl={isGroup ? null : receiverProfile?.avatar_data_url}
         />
         <div className="conversation-title">
-          <h2>{receiverName || dialog.members.join(", ")}</h2>
+          <h2>{dialogName || dialog.members.join(", ")}</h2>
           <p>
             <span className="online-dot" />
-            Защищенный диалог
+            {dialogSubtitle}
           </p>
         </div>
       </header>
@@ -322,6 +333,9 @@ export function DialogPage({
               ) : null}
 
               <article className={`message${isOwn ? " own" : ""}`}>
+                {isGroup && !isOwn ? (
+                  <p className="message-sender">{message.sender_username}</p>
+                ) : null}
                 {message.text ? (
                   <p className="message-text">{message.text}</p>
                 ) : null}

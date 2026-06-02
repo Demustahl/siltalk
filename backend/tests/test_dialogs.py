@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from collections.abc import Generator
 
 import httpx
@@ -9,8 +10,16 @@ from sqlalchemy.pool import StaticPool
 from app.auth import create_access_token, hash_password
 from app.database import Base, get_db_session
 from app.main import app
-from app.messages import save_direct_message
-from app.models import Message, MessageDeliveryStatus, User
+from app.messages import save_dialog_message, save_direct_message
+from app.models import (
+    DeviceKey,
+    Dialog,
+    DialogMember,
+    Message,
+    MessageDeliveryStatus,
+    User,
+    UserDevice,
+)
 
 
 class DialogsTestClient:
@@ -64,6 +73,35 @@ class DialogsTestClient:
 
             return user
 
+    def publish_public_key(self, user: User, public_key: str | None = None) -> None:
+        with self.session_local() as db_session:
+            device = UserDevice(user_id=user.id, name="browser")
+            db_session.add(device)
+            db_session.flush()
+            db_session.add(
+                DeviceKey(
+                    device_id=device.id,
+                    identity_key_public=public_key or "A" * 44,
+                )
+            )
+            db_session.commit()
+
+    def create_group_dialog(self, users: list[User], title: str = "Team") -> Dialog:
+        with self.session_local() as db_session:
+            dialog = Dialog(dialog_type="group", title=title)
+            db_session.add(dialog)
+            db_session.flush()
+            db_session.add_all(
+                [
+                    DialogMember(dialog_id=dialog.id, user_id=user.id)
+                    for user in users
+                ]
+            )
+            db_session.commit()
+            db_session.refresh(dialog)
+
+            return dialog
+
     # Создает заголовок авторизации для пользователя
     def auth_headers(self, user: User) -> dict[str, str]:
         token = create_access_token(user)
@@ -79,6 +117,26 @@ class DialogsTestClient:
                 db_session,
                 attached_sender,
                 receiver,
+                ciphertext,
+            )
+            assert message is not None
+
+            return message
+
+    def save_group_message(
+        self,
+        sender: User,
+        dialog_id: uuid.UUID,
+        ciphertext: str,
+    ) -> Message:
+        with self.session_local() as db_session:
+            attached_sender = db_session.get(User, sender.id)
+            assert attached_sender is not None
+
+            message = save_dialog_message(
+                db_session,
+                attached_sender,
+                dialog_id,
                 ciphertext,
             )
             assert message is not None
@@ -257,6 +315,116 @@ def test_read_dialog_messages_returns_not_found_for_not_member() -> None:
             )
 
             assert response.status_code == 404
+
+    asyncio.run(run_test())
+
+
+def test_create_group_dialog_requires_public_keys_and_returns_member_keys() -> None:
+    async def run_test() -> None:
+        async with DialogsTestClient() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+            user3 = test_app.create_user("user3")
+
+            test_app.publish_public_key(user1, "A" * 44)
+            test_app.publish_public_key(user2, "B" * 44)
+
+            missing_key_response = await test_app.client.post(
+                "/dialogs/groups",
+                headers=test_app.auth_headers(user1),
+                json={
+                    "title": "Project team",
+                    "member_usernames": ["user2", "user3"],
+                },
+            )
+
+            assert missing_key_response.status_code == 409
+
+            test_app.publish_public_key(user3, "C" * 44)
+
+            create_response = await test_app.client.post(
+                "/dialogs/groups",
+                headers=test_app.auth_headers(user1),
+                json={
+                    "title": "Project team",
+                    "member_usernames": ["user2", "user3"],
+                },
+            )
+
+            assert create_response.status_code == 201
+            response_data = create_response.json()
+            assert response_data["dialog_type"] == "group"
+            assert response_data["title"] == "Project team"
+            assert set(response_data["members"]) == {"user1", "user2", "user3"}
+            assert response_data["unread_count"] == 0
+
+            keys_response = await test_app.client.get(
+                f"/dialogs/{response_data['id']}/keys",
+                headers=test_app.auth_headers(user1),
+            )
+
+            assert keys_response.status_code == 200
+            assert {
+                key_data["username"]
+                for key_data in keys_response.json()
+            } == {"user1", "user2", "user3"}
+
+    asyncio.run(run_test())
+
+
+def test_group_unread_count_and_sender_status_are_per_recipient() -> None:
+    async def run_test() -> None:
+        async with DialogsTestClient() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+            user3 = test_app.create_user("user3")
+            dialog = test_app.create_group_dialog([user1, user2, user3])
+            message = test_app.save_group_message(
+                user1,
+                dialog.id,
+                "ciphertext-group",
+            )
+
+            user2_dialogs = await test_app.client.get(
+                "/dialogs",
+                headers=test_app.auth_headers(user2),
+            )
+
+            assert user2_dialogs.status_code == 200
+            assert user2_dialogs.json()[0]["id"] == str(dialog.id)
+            assert user2_dialogs.json()[0]["unread_count"] == 1
+
+            user2_read_response = await test_app.client.post(
+                f"/dialogs/{dialog.id}/read",
+                headers=test_app.auth_headers(user2),
+            )
+
+            assert user2_read_response.status_code == 200
+            assert user2_read_response.json()["marked_read_count"] == 1
+
+            sender_history_response = await test_app.client.get(
+                f"/dialogs/{dialog.id}/messages",
+                headers=test_app.auth_headers(user1),
+            )
+
+            assert sender_history_response.status_code == 200
+            assert sender_history_response.json()[0]["id"] == str(message.id)
+            assert sender_history_response.json()[0]["status"] == "sent"
+
+            user3_read_response = await test_app.client.post(
+                f"/dialogs/{dialog.id}/read",
+                headers=test_app.auth_headers(user3),
+            )
+
+            assert user3_read_response.status_code == 200
+
+            read_sender_history_response = await test_app.client.get(
+                f"/dialogs/{dialog.id}/messages",
+                headers=test_app.auth_headers(user1),
+            )
+
+            assert read_sender_history_response.status_code == 200
+            assert read_sender_history_response.json()[0]["status"] == "read"
 
     asyncio.run(run_test())
 

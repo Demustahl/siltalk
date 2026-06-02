@@ -3,9 +3,11 @@ import { MessageCircle, Search, ShieldCheck } from "lucide-react";
 import { Avatar } from "../components/Avatar.jsx";
 import {
   formatDateTime,
+  getDialogDisplayName,
   getDialogReceiver,
   getDialogReceiverProfile,
-  getUserDisplayName,
+  getDialogSubtitle,
+  isGroupDialog,
 } from "../lib/format.js";
 
 export function DialogsPage({ dialogs, me, navigate }) {
@@ -32,7 +34,9 @@ export function DialogsPage({ dialogs, me, navigate }) {
           dialogs.map((dialog) => {
             const receiverProfile = getDialogReceiverProfile(dialog, me.username);
             const receiver = getDialogReceiver(dialog, me.username);
-            const receiverName = getUserDisplayName(receiverProfile) || receiver;
+            const dialogName = getDialogDisplayName(dialog, me.username);
+            const dialogSubtitle = getDialogSubtitle(dialog, me.username);
+            const isGroup = isGroupDialog(dialog);
 
             return (
               <button
@@ -42,15 +46,15 @@ export function DialogsPage({ dialogs, me, navigate }) {
                 onClick={() => navigate(`/dialogs/${dialog.id}`)}
               >
                 <Avatar
-                  username={receiver || dialog.members[0]}
+                  username={isGroup ? dialogName : receiver}
                   size="medium"
-                  avatarId={receiverProfile?.avatar_id}
-                  avatarDataUrl={receiverProfile?.avatar_data_url}
+                  avatarId={isGroup ? null : receiverProfile?.avatar_id}
+                  avatarDataUrl={isGroup ? null : receiverProfile?.avatar_data_url}
                 />
                 <span className="dialog-card-body">
                   <span className="dialog-row">
                     <span className="dialog-card-title">
-                      {receiverName || dialog.members.join(", ")}
+                      {dialogName || dialog.members.join(", ")}
                     </span>
                     {dialog.unread_count > 0 ? (
                       <span className="unread-badge">{dialog.unread_count}</span>
@@ -58,7 +62,7 @@ export function DialogsPage({ dialogs, me, navigate }) {
                   </span>
                   <span className="dialog-meta">
                     <ShieldCheck size={13} aria-hidden="true" />
-                    {dialog.dialog_type} · {formatDateTime(dialog.created_at)}
+                    {dialogSubtitle} · {formatDateTime(dialog.created_at)}
                   </span>
                 </span>
               </button>

@@ -80,6 +80,7 @@ function encryptForPublicKey(text, publicKey) {
 export async function createEncryptedEnvelope({
   text = "",
   attachments = [],
+  recipients = [],
   senderUsername,
   senderPublicKey,
   receiverUsername,
@@ -92,14 +93,30 @@ export async function createEncryptedEnvelope({
     text,
     attachments,
   });
+  const recipientKeys =
+    recipients.length > 0
+      ? recipients
+      : [
+          { username: receiverUsername, publicKey: receiverPublicKey },
+          { username: senderUsername, publicKey: senderPublicKey },
+        ];
+  const encryptedRecipients = {};
+
+  for (const recipient of recipientKeys) {
+    if (!recipient?.username || !recipient?.publicKey) {
+      continue;
+    }
+
+    encryptedRecipients[recipient.username] = encryptForPublicKey(
+      payload,
+      recipient.publicKey,
+    );
+  }
 
   return JSON.stringify({
     version: 1,
     algorithm: "libsodium.crypto_box_seal",
-    recipients: {
-      [receiverUsername]: encryptForPublicKey(payload, receiverPublicKey),
-      [senderUsername]: encryptForPublicKey(payload, senderPublicKey),
-    },
+    recipients: encryptedRecipients,
   });
 }
 

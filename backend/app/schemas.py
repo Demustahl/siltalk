@@ -65,6 +65,11 @@ class DialogRead(BaseModel):
     created_at: datetime
 
 
+class GroupDialogCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    member_usernames: list[str] = Field(min_length=1, max_length=20)
+
+
 class MessageRead(BaseModel):
     id: uuid.UUID
     dialog_id: uuid.UUID

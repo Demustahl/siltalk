@@ -12,9 +12,12 @@ import { useState } from "react";
 import { Avatar } from "./Avatar.jsx";
 import {
   formatDateTime,
+  getDialogDisplayName,
   getDialogReceiver,
   getDialogReceiverProfile,
+  getDialogSubtitle,
   getUserDisplayName,
+  isGroupDialog,
 } from "../lib/format.js";
 
 export function AppLayout({
@@ -116,7 +119,9 @@ export function AppLayout({
             visibleDialogs.map((dialog) => {
               const receiverProfile = getDialogReceiverProfile(dialog, me.username);
               const receiver = getDialogReceiver(dialog, me.username);
-              const receiverName = getUserDisplayName(receiverProfile) || receiver;
+              const dialogName = getDialogDisplayName(dialog, me.username);
+              const dialogSubtitle = getDialogSubtitle(dialog, me.username);
+              const isGroup = isGroupDialog(dialog);
               const isActive = dialog.id === activeDialogId;
 
               return (
@@ -127,15 +132,15 @@ export function AppLayout({
                   onClick={() => navigate(`/dialogs/${dialog.id}`)}
                 >
                   <Avatar
-                    username={receiver || dialog.members[0]}
+                    username={isGroup ? dialogName : receiver}
                     size="small"
-                    avatarId={receiverProfile?.avatar_id}
-                    avatarDataUrl={receiverProfile?.avatar_data_url}
+                    avatarId={isGroup ? null : receiverProfile?.avatar_id}
+                    avatarDataUrl={isGroup ? null : receiverProfile?.avatar_data_url}
                   />
                   <span className="dialog-main">
                     <span className="dialog-row">
                       <span className="dialog-members">
-                        {receiverName || dialog.members.join(", ")}
+                        {dialogName || dialog.members.join(", ")}
                       </span>
                       <span className="dialog-time">
                         {formatDateTime(dialog.created_at)}
@@ -143,7 +148,7 @@ export function AppLayout({
                     </span>
                     <span className="dialog-preview">
                       <ShieldCheck size={13} aria-hidden="true" />
-                      E2EE диалог
+                      {dialogSubtitle}
                     </span>
                   </span>
                   {dialog.unread_count > 0 ? (

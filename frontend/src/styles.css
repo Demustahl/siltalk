@@ -324,6 +324,28 @@ h2 {
   font-weight: 800;
 }
 
+.mode-switch {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.mode-switch button {
+  min-height: 40px;
+  border-radius: 12px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.mode-switch button.active {
+  color: #041013;
+  background: var(--primary);
+  font-weight: 800;
+}
+
 .section-title {
   color: var(--muted-strong);
   font-size: 13px;
@@ -523,6 +545,11 @@ h2 {
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
+.user-result.selected {
+  border-color: var(--line-strong);
+  background: rgba(31, 201, 212, 0.1);
+}
+
 .dialog-main,
 .dialog-card-body {
   display: grid;
@@ -690,6 +717,36 @@ h2 {
 .key-missing {
   color: var(--danger);
   background: rgba(255, 107, 107, 0.12);
+}
+
+.selected-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selected-user {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  max-width: min(360px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.selected-user > span {
+  display: grid;
+  min-width: 0;
+}
+
+.selected-user strong,
+.selected-user small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-page {
@@ -935,6 +992,13 @@ h2 {
   white-space: pre-wrap;
   font-size: 16px;
   line-height: 1.42;
+}
+
+.message-sender {
+  margin-bottom: 5px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .message-footer {
@@ -1185,6 +1249,14 @@ h2 {
   .settings-grid,
   .settings-facts div {
     grid-template-columns: 1fr;
+  }
+
+  .mode-switch {
+    width: 100%;
+  }
+
+  .mode-switch button {
+    flex: 1;
   }
 
   .settings-secure-pill {

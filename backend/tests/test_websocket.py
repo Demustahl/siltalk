@@ -14,7 +14,7 @@ from app.auth import create_access_token, hash_password
 from app.database import Base, get_db_session
 from app.main import app
 from app.messages import save_direct_message
-from app.models import DialogMember, Message, MessageDeliveryStatus, User
+from app.models import Dialog, DialogMember, Message, MessageDeliveryStatus, User
 from app.realtime import manager
 
 
@@ -99,6 +99,22 @@ class WebSocketTestApp:
     def get_delivery_statuses(self) -> list[MessageDeliveryStatus]:
         with self.session_local() as db_session:
             return list(db_session.scalars(select(MessageDeliveryStatus)).all())
+
+    def create_group_dialog(self, users: list[User], title: str = "Team") -> Dialog:
+        with self.session_local() as db_session:
+            dialog = Dialog(dialog_type="group", title=title)
+            db_session.add(dialog)
+            db_session.flush()
+            db_session.add_all(
+                [
+                    DialogMember(dialog_id=dialog.id, user_id=user.id)
+                    for user in users
+                ]
+            )
+            db_session.commit()
+            db_session.refresh(dialog)
+
+            return dialog
 
     # Возвращает usernames участников диалога
     def get_dialog_member_usernames(self, dialog_id: uuid.UUID) -> set[str]:
@@ -251,6 +267,62 @@ def test_websocket_sends_message_to_other_client() -> None:
             delivery_statuses = test_app.get_delivery_statuses()
             assert len(delivery_statuses) == 2
             assert {status.status for status in delivery_statuses} == {"delivered"}
+
+    asyncio.run(run_test())
+
+
+def test_websocket_sends_group_message_to_online_members() -> None:
+    async def run_test() -> None:
+        async with WebSocketTestApp() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+            user3 = test_app.create_user("user3")
+            dialog = test_app.create_group_dialog([user1, user2, user3])
+            user1_token = create_access_token(user1)
+            user2_token = create_access_token(user2)
+
+            async with (
+                WebSocketSession(f"/ws?token={user1_token}") as user1_socket,
+                WebSocketSession(f"/ws?token={user2_token}") as user2_socket,
+            ):
+                await user1_socket.send_json(
+                    {
+                        "type": "message",
+                        "dialog_id": str(dialog.id),
+                        "ciphertext": "ciphertext-group",
+                    }
+                )
+
+                receiver_message = await user2_socket.receive_json()
+                assert receiver_message["type"] == "message"
+                assert receiver_message["from"] == "user1"
+                assert receiver_message["dialog_id"] == str(dialog.id)
+                assert receiver_message["ciphertext"] == "ciphertext-group"
+                assert receiver_message["status"] == "delivered"
+
+                sender_status = await user1_socket.receive_json()
+                assert sender_status["type"] == "message_status"
+                assert sender_status["dialog_id"] == str(dialog.id)
+                assert sender_status["status"] == "sent"
+                assert sender_status["saved"] is True
+                assert sender_status["delivered"] is True
+                assert sender_status["delivered_count"] == 1
+                assert sender_status["recipient_count"] == 2
+
+            saved_messages = test_app.get_messages()
+            assert len(saved_messages) == 1
+            assert saved_messages[0].ciphertext == "ciphertext-group"
+            assert saved_messages[0].dialog_id == dialog.id
+
+            delivery_statuses = test_app.get_delivery_statuses()
+            assert len(delivery_statuses) == 2
+            assert {
+                status.user_id: status.status
+                for status in delivery_statuses
+            } == {
+                user2.id: "delivered",
+                user3.id: "sent",
+            }
 
     asyncio.run(run_test())
 

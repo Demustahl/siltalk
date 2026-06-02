@@ -31,8 +31,18 @@ export function createApiClient(apiUrl, token) {
     }
 
     if (!response.ok) {
-      const message = data?.detail || "Ошибка запроса";
-      throw new Error(Array.isArray(message) ? "Проверь поля формы" : message);
+      const detail = data?.detail;
+      let message = "Ошибка запроса";
+
+      if (Array.isArray(detail)) {
+        message = "Проверь поля формы";
+      } else if (typeof detail === "string") {
+        message = detail;
+      } else if (detail?.message) {
+        message = detail.message;
+      }
+
+      throw new Error(message);
     }
 
     return data;
@@ -47,11 +57,11 @@ export function createApiClient(apiUrl, token) {
         },
       });
     } catch {
-      throw new Error("Backend РЅРµРґРѕСЃС‚СѓРїРµРЅ РёР»Рё Р±Р°Р·Р° РґР°РЅРЅС‹С… РЅРµ Р·Р°РїСѓС‰РµРЅР°");
+      throw new Error("Backend недоступен или база данных не запущена");
     }
 
     if (!response.ok) {
-      throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ РІР»РѕР¶РµРЅРёРµ");
+      throw new Error("Не удалось скачать вложение");
     }
 
     return response.arrayBuffer();
@@ -105,6 +115,17 @@ export function createApiClient(apiUrl, token) {
 
     readDialogs() {
       return request("/dialogs");
+    },
+
+    createGroupDialog(groupData) {
+      return request("/dialogs/groups", {
+        method: "POST",
+        body: JSON.stringify(groupData),
+      });
+    },
+
+    readDialogPublicKeys(dialogId) {
+      return request(`/dialogs/${dialogId}/keys`);
     },
 
     readMessages(dialogId) {
