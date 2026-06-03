@@ -451,7 +451,6 @@ export function App() {
       activeDialogId={activeDialogId}
       currentRoute={route.name}
       onLogout={logout}
-      onRefreshDialogs={loadDialogs}
       navigate={navigate}
     >
       {route.name === "dialog" ? (

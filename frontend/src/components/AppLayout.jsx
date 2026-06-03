@@ -1,8 +1,6 @@
 import {
   LogOut,
   PenLine,
-  MessageCircle,
-  RefreshCw,
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
@@ -26,15 +24,10 @@ export function AppLayout({
   activeDialogId,
   currentRoute,
   onLogout,
-  onRefreshDialogs,
   navigate,
   children,
 }) {
   const [dialogFilter, setDialogFilter] = useState("all");
-  const unreadTotal = dialogs.reduce(
-    (total, dialog) => total + dialog.unread_count,
-    0,
-  );
   const visibleDialogs =
     dialogFilter === "unread"
       ? dialogs.filter((dialog) => dialog.unread_count > 0)
@@ -49,10 +42,9 @@ export function AppLayout({
           </div>
           <div className="brand-copy">
             <h1>SilTalk</h1>
-            <p>Безопасно. Конфиденциально. Всегда.</p>
           </div>
           <button
-            className="icon-button glass-button"
+            className="icon-button glass-button brand-action"
             type="button"
             title="Новый диалог"
             onClick={() => navigate("/new")}
@@ -67,7 +59,7 @@ export function AppLayout({
           onClick={() => navigate("/new")}
         >
           <Search size={19} aria-hidden="true" />
-          <span>Поиск пользователя</span>
+          <span>Поиск по чатам</span>
         </button>
 
         <nav className="chat-tabs" aria-label="Фильтры диалогов">
@@ -80,7 +72,6 @@ export function AppLayout({
             }}
           >
             Все чаты
-            <span>{dialogs.length}</span>
           </button>
           <button
             className={dialogFilter === "unread" ? "active" : ""}
@@ -91,29 +82,20 @@ export function AppLayout({
             }}
           >
             Непрочитанные
-            <span>{unreadTotal}</span>
           </button>
         </nav>
 
-        <div className="section-title">
-          <span>Диалоги</span>
-          <button
-            className="icon-button subtle-button"
-            type="button"
-            title="Обновить диалоги"
-            onClick={onRefreshDialogs}
-          >
-            <RefreshCw size={16} aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="dialogs-list">
+        <div className={`dialogs-list${visibleDialogs.length === 0 ? " dialogs-list-empty" : ""}`}>
           {visibleDialogs.length === 0 ? (
-            <div className="empty-state compact">
-              <MessageCircle size={18} aria-hidden="true" />
-              <span>
-                {dialogFilter === "unread" ? "Непрочитанных нет" : "Пока пусто"}
-              </span>
+            <div className="sidebar-empty-state">
+              <h2>
+                {dialogFilter === "unread" ? "Непрочитанных нет" : "Здесь пока пусто"}
+              </h2>
+              <p>
+                {dialogFilter === "unread"
+                  ? "Новые сообщения появятся здесь."
+                  : "Начните защищенную переписку — найдите пользователя или создайте новый чат."}
+              </p>
             </div>
           ) : (
             visibleDialogs.map((dialog) => {
