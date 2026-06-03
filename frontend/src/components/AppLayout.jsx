@@ -28,10 +28,40 @@ export function AppLayout({
   children,
 }) {
   const [dialogFilter, setDialogFilter] = useState("all");
-  const visibleDialogs =
+  const [dialogSearch, setDialogSearch] = useState("");
+  const searchQuery = dialogSearch.trim().toLocaleLowerCase("ru-RU");
+  const filteredByTab =
     dialogFilter === "unread"
       ? dialogs.filter((dialog) => dialog.unread_count > 0)
       : dialogs;
+  const visibleDialogs = searchQuery
+    ? filteredByTab.filter((dialog) => {
+        const receiverProfile = getDialogReceiverProfile(dialog, me.username);
+        const searchText = [
+          getDialogDisplayName(dialog, me.username),
+          getDialogPreview(dialog, me.username),
+          getDialogReceiver(dialog, me.username),
+          receiverProfile?.display_name,
+          receiverProfile?.username,
+          ...(dialog.members || []),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase("ru-RU");
+
+        return searchText.includes(searchQuery);
+      })
+    : filteredByTab;
+  const emptyTitle = searchQuery
+    ? "Ничего не найдено"
+    : dialogFilter === "unread"
+      ? "Непрочитанных нет"
+      : "Здесь пока пусто";
+  const emptyText = searchQuery
+    ? "Попробуйте изменить запрос."
+    : dialogFilter === "unread"
+      ? "Новые сообщения появятся здесь."
+      : "Начните защищенную переписку — найдите пользователя или создайте новый чат.";
 
   return (
     <main className={`app-shell route-${currentRoute}`}>
@@ -53,14 +83,18 @@ export function AppLayout({
           </button>
         </header>
 
-        <button
+        <label
           className="search-trigger"
-          type="button"
-          onClick={() => navigate("/new")}
         >
           <Search size={19} aria-hidden="true" />
-          <span>Поиск по чатам</span>
-        </button>
+          <input
+            type="search"
+            value={dialogSearch}
+            aria-label="Поиск по чатам"
+            placeholder="Поиск по чатам"
+            onChange={(event) => setDialogSearch(event.target.value)}
+          />
+        </label>
 
         <nav className="chat-tabs" aria-label="Фильтры диалогов">
           <button
@@ -88,14 +122,8 @@ export function AppLayout({
         <div className={`dialogs-list${visibleDialogs.length === 0 ? " dialogs-list-empty" : ""}`}>
           {visibleDialogs.length === 0 ? (
             <div className="sidebar-empty-state">
-              <h2>
-                {dialogFilter === "unread" ? "Непрочитанных нет" : "Здесь пока пусто"}
-              </h2>
-              <p>
-                {dialogFilter === "unread"
-                  ? "Новые сообщения появятся здесь."
-                  : "Начните защищенную переписку — найдите пользователя или создайте новый чат."}
-              </p>
+              <h2>{emptyTitle}</h2>
+              <p>{emptyText}</p>
             </div>
           ) : (
             visibleDialogs.map((dialog) => {
