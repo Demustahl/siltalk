@@ -138,6 +138,25 @@ h2 {
   gap: 8px;
 }
 
+.auth-brand-centered {
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.auth-product-name {
+  color: var(--text);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.auth-brand-centered h1 {
+  color: var(--muted-strong);
+  font-size: 36px;
+}
+
 .auth-brand .brand-mark {
   width: 52px;
   height: 52px;
