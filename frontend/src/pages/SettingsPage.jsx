@@ -4,6 +4,7 @@ import {
   ImagePlus,
   KeyRound,
   Save,
+  ShieldCheck,
   UserRound,
   X,
 } from "lucide-react";
