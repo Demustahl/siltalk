@@ -124,11 +124,11 @@ h2 {
 
 .auth-panel {
   display: grid;
-  width: min(430px, 100%);
-  gap: 17px;
+  width: min(400px, 100%);
+  gap: 16px;
   border: 1px solid var(--line);
   border-radius: 22px;
-  padding: 26px;
+  padding: 28px;
   background: rgba(13, 21, 27, 0.92);
   box-shadow: var(--shadow);
 }
@@ -140,21 +140,35 @@ h2 {
 
 .auth-brand-centered {
   justify-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: 12px;
+  margin-bottom: 2px;
   text-align: center;
 }
 
 .auth-product-name {
-  color: var(--text);
-  font-size: 34px;
+  color: var(--muted-strong);
+  font-size: 22px;
   font-weight: 900;
   line-height: 1;
 }
 
-.auth-brand-centered h1 {
+.auth-divider {
+  width: min(290px, 100%);
+  height: 1px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(31, 201, 212, 0.38),
+      transparent
+    );
+  box-shadow: 0 0 16px rgba(31, 201, 212, 0.75);
+}
+
+.auth-panel .auth-brand-centered h1 {
   color: var(--muted-strong);
-  font-size: 36px;
+  font-size: 26px;
+  font-weight: 900;
 }
 
 .auth-brand .brand-mark {
@@ -166,6 +180,34 @@ h2 {
 .loading-page h1 {
   margin-top: 2px;
   font-size: 30px;
+}
+
+.auth-password-field {
+  position: relative;
+  display: block;
+}
+
+.auth-password-field input {
+  padding-right: 52px;
+}
+
+.password-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  color: var(--primary);
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.password-visibility-button:hover {
+  color: var(--text);
+  background: rgba(31, 201, 212, 0.12);
 }
 
 .app-shell {

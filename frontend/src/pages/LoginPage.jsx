@@ -1,4 +1,4 @@
-import { LogIn } from "lucide-react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useState } from "react";
 
 export function LoginPage({ notice, onLogin, navigate }) {
@@ -8,6 +8,7 @@ export function LoginPage({ notice, onLogin, navigate }) {
   });
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   function updateField(event) {
     setForm((current) => ({
@@ -35,17 +36,19 @@ export function LoginPage({ notice, onLogin, navigate }) {
       <form className="auth-panel" onSubmit={handleSubmit}>
         <div className="auth-brand auth-brand-centered">
           <p className="auth-product-name">SilTalk</p>
-          <h1>Вход</h1>
+          <span className="auth-divider" aria-hidden="true" />
+          <h1>Вход в аккаунт</h1>
         </div>
 
         <label>
-          Username
+          Имя пользователя
           <input
             name="username"
             type="text"
             minLength={3}
             maxLength={64}
             autoComplete="username"
+            placeholder="Введите имя пользователя"
             value={form.username}
             onChange={updateField}
             required
@@ -54,16 +57,31 @@ export function LoginPage({ notice, onLogin, navigate }) {
 
         <label>
           Пароль
-          <input
-            name="password"
-            type="password"
-            minLength={8}
-            maxLength={128}
-            autoComplete="current-password"
-            value={form.password}
-            onChange={updateField}
-            required
-          />
+          <span className="auth-password-field">
+            <input
+              name="password"
+              type={isPasswordVisible ? "text" : "password"}
+              minLength={8}
+              maxLength={128}
+              autoComplete="current-password"
+              placeholder="Введите пароль"
+              value={form.password}
+              onChange={updateField}
+              required
+            />
+            <button
+              className="password-visibility-button"
+              type="button"
+              title={isPasswordVisible ? "Скрыть пароль" : "Показать пароль"}
+              onClick={() => setIsPasswordVisible((isVisible) => !isVisible)}
+            >
+              {isPasswordVisible ? (
+                <EyeOff size={17} aria-hidden="true" />
+              ) : (
+                <Eye size={17} aria-hidden="true" />
+              )}
+            </button>
+          </span>
         </label>
 
         <button type="submit" disabled={isSubmitting}>

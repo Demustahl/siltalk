@@ -1,4 +1,4 @@
-import { ShieldCheck, UserPlus } from "lucide-react";
+import { Eye, EyeOff, UserPlus } from "lucide-react";
 import { useState } from "react";
 
 export function RegisterPage({ onRegister, navigate }) {
@@ -9,6 +9,7 @@ export function RegisterPage({ onRegister, navigate }) {
   });
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   function updateField(event) {
     setForm((current) => ({
@@ -34,22 +35,21 @@ export function RegisterPage({ onRegister, navigate }) {
   return (
     <main className="auth-page">
       <form className="auth-panel" onSubmit={handleSubmit}>
-        <div className="auth-brand">
-          <span className="brand-mark">
-            <ShieldCheck size={28} aria-hidden="true" />
-          </span>
-          <p className="eyebrow">SilTalk</p>
+        <div className="auth-brand auth-brand-centered">
+          <p className="auth-product-name">SilTalk</p>
+          <span className="auth-divider" aria-hidden="true" />
           <h1>Регистрация</h1>
         </div>
 
         <label>
-          Username
+          Имя пользователя
           <input
             name="username"
             type="text"
             minLength={3}
             maxLength={64}
             autoComplete="username"
+            placeholder="Введите имя пользователя"
             value={form.username}
             onChange={updateField}
             required
@@ -58,16 +58,31 @@ export function RegisterPage({ onRegister, navigate }) {
 
         <label>
           Пароль
-          <input
-            name="password"
-            type="password"
-            minLength={8}
-            maxLength={128}
-            autoComplete="new-password"
-            value={form.password}
-            onChange={updateField}
-            required
-          />
+          <span className="auth-password-field">
+            <input
+              name="password"
+              type={isPasswordVisible ? "text" : "password"}
+              minLength={8}
+              maxLength={128}
+              autoComplete="new-password"
+              placeholder="Введите пароль"
+              value={form.password}
+              onChange={updateField}
+              required
+            />
+            <button
+              className="password-visibility-button"
+              type="button"
+              title={isPasswordVisible ? "Скрыть пароль" : "Показать пароль"}
+              onClick={() => setIsPasswordVisible((isVisible) => !isVisible)}
+            >
+              {isPasswordVisible ? (
+                <EyeOff size={17} aria-hidden="true" />
+              ) : (
+                <Eye size={17} aria-hidden="true" />
+              )}
+            </button>
+          </span>
         </label>
 
         <label>
@@ -76,6 +91,7 @@ export function RegisterPage({ onRegister, navigate }) {
             name="displayName"
             type="text"
             maxLength={120}
+            placeholder="Введите отображаемое имя"
             value={form.displayName}
             onChange={updateField}
           />
