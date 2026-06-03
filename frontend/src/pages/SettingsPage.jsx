@@ -4,7 +4,6 @@ import {
   ImagePlus,
   KeyRound,
   Save,
-  ShieldCheck,
   UserRound,
   X,
 } from "lucide-react";
@@ -291,22 +290,11 @@ export function SettingsPage({ me, e2ee, onUpdateProfile, navigate }) {
           </dl>
         </section>
 
-        <section className="settings-card">
-          <div className="settings-card-heading">
-            <span className="settings-icon">
-              <ShieldCheck size={20} aria-hidden="true" />
-            </span>
-            <div>
-              <h3>Задел настроек</h3>
-              <p>Здесь позже можно добавить устройства, сессии и приватность.</p>
-            </div>
-          </div>
-          <p className="settings-note">
-            Сейчас это простой MVP-кабинет: профиль, аватар и краткий статус E2EE.
-          </p>
-        </section>
-
         <div className="settings-actions">
+          <span className="settings-action-status">
+            {statusText ? <span className="status-line success">{statusText}</span> : null}
+            {error ? <span className="status-line error">{error}</span> : null}
+          </span>
           <button
             className="ghost-button"
             type="button"
@@ -320,9 +308,6 @@ export function SettingsPage({ me, e2ee, onUpdateProfile, navigate }) {
           </button>
         </div>
       </form>
-
-      {statusText ? <p className="status-line success">{statusText}</p> : null}
-      {error ? <p className="status-line error">{error}</p> : null}
     </div>
   );
 }
