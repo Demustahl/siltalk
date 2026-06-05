@@ -182,6 +182,10 @@ h2 {
   font-size: 30px;
 }
 
+.auth-notice {
+  text-align: center;
+}
+
 .auth-password-field {
   position: relative;
   display: block;

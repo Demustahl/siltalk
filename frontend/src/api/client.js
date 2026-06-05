@@ -109,6 +109,18 @@ export function createApiClient(apiUrl, token) {
       return request(`/users/${encodeURIComponent(username)}/keys`);
     },
 
+    async readUserPublicKeyOrNull(username) {
+      try {
+        return await request(`/users/${encodeURIComponent(username)}/keys`);
+      } catch (error) {
+        if (error.message === "Публичный ключ пользователя не найден") {
+          return null;
+        }
+
+        throw error;
+      }
+    },
+
     searchUsers(username) {
       return request(`/users/search?username=${encodeURIComponent(username)}`);
     },

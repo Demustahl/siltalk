@@ -69,6 +69,20 @@ export async function ensureLocalKeyPair(username) {
   };
 }
 
+export async function readLocalKeyPair(username) {
+  await ensureSodium();
+
+  const keyPair = readSavedKeyPair(username);
+  if (!keyPair) {
+    return null;
+  }
+
+  return {
+    keyPair,
+    publicKey: encodeBytes(keyPair.publicKey),
+  };
+}
+
 function encryptForPublicKey(text, publicKey) {
   const plaintext = sodium.from_string(text);
   const publicKeyBytes = decodeBytes(publicKey);

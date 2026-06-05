@@ -1,7 +1,7 @@
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useState } from "react";
 
-export function LoginPage({ notice, onLogin, navigate }) {
+export function LoginPage({ notice, sessionError = "", onLogin, navigate }) {
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -9,6 +9,7 @@ export function LoginPage({ notice, onLogin, navigate }) {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const visibleError = error || sessionError;
 
   function updateField(event) {
     setForm((current) => ({
@@ -97,8 +98,8 @@ export function LoginPage({ notice, onLogin, navigate }) {
           Зарегистрироваться
         </button>
 
-        {notice ? <p className="status-line success">{notice}</p> : null}
-        {error ? <p className="status-line error">{error}</p> : null}
+        {notice ? <p className="status-line success auth-notice">{notice}</p> : null}
+        {visibleError ? <p className="status-line error">{visibleError}</p> : null}
       </form>
     </main>
   );

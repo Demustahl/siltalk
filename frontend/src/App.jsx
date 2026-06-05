@@ -6,6 +6,7 @@ import {
   createEncryptedEnvelope,
   decryptMessageEnvelope,
   ensureLocalKeyPair,
+  readLocalKeyPair,
 } from "./lib/e2ee.js";
 import { normalizeUsername } from "./lib/format.js";
 import { DialogPage } from "./pages/DialogPage.jsx";
@@ -17,6 +18,10 @@ import { SettingsPage } from "./pages/SettingsPage.jsx";
 
 const DEFAULT_API_URL = "http://127.0.0.1:8000";
 const API_URL = cleanApiUrl(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
+const E2EE_KEY_ON_ANOTHER_DEVICE_MESSAGE =
+  "У этого пользователя приватный ключ находится в другом браузере или на другом устройстве.";
+const E2EE_KEY_MISMATCH_MESSAGE =
+  "Локальный приватный ключ не подходит к этому аккаунту. Войдите там, где был создан ключ.";
 
 function readRoute() {
   const hash = window.location.hash.replace(/^#\/?/, "");
@@ -69,10 +74,33 @@ async function decryptDialogPreviews(rawDialogs, currentUser, e2eeData) {
   );
 }
 
+async function prepareE2eeSession(api, currentUser) {
+  const localKeys = await readLocalKeyPair(currentUser.username);
+  const publishedKey = await api.readUserPublicKeyOrNull(currentUser.username);
+
+  if (publishedKey && !localKeys) {
+    throw new Error(E2EE_KEY_ON_ANOTHER_DEVICE_MESSAGE);
+  }
+
+  if (publishedKey) {
+    if (publishedKey.public_key !== localKeys.publicKey) {
+      throw new Error(E2EE_KEY_MISMATCH_MESSAGE);
+    }
+
+    return localKeys;
+  }
+
+  const keys = localKeys || (await ensureLocalKeyPair(currentUser.username));
+  await api.publishPublicKey(keys.publicKey);
+
+  return keys;
+}
+
 export function App() {
   const [route, setRoute] = useState(readRoute);
   const [token, setToken] = useState(localStorage.getItem("accessToken") || "");
   const [authNotice, setAuthNotice] = useState("");
+  const [authError, setAuthError] = useState("");
   const [me, setMe] = useState(null);
   const [e2ee, setE2ee] = useState(null);
   const [dialogs, setDialogs] = useState([]);
@@ -105,6 +133,7 @@ export function App() {
   }, []);
 
   const logout = useCallback(() => {
+    setAuthError("");
     clearSession();
     navigate("/login");
   }, [clearSession, navigate]);
@@ -133,10 +162,15 @@ export function App() {
   const handleLogin = useCallback(
     async ({ username, password }) => {
       const loginApi = createApiClient(API_URL, "");
+      setAuthError("");
       const tokenData = await loginApi.login(
         normalizeUsername(username),
         password,
       );
+      const sessionApi = createApiClient(API_URL, tokenData.access_token);
+      const currentUser = await sessionApi.me();
+
+      await prepareE2eeSession(sessionApi, currentUser);
       setAuthNotice("");
       await finishLogin(tokenData.access_token);
     },
@@ -154,6 +188,7 @@ export function App() {
         display_name: displayName.trim() || null,
       });
 
+      setAuthError("");
       setAuthNotice("Аккаунт создан. Теперь войдите.");
       navigate("/login");
     },
@@ -317,8 +352,7 @@ export function App() {
 
       try {
         const currentUser = await api.me();
-        const keys = await ensureLocalKeyPair(currentUser.username);
-        await api.publishPublicKey(keys.publicKey);
+        const keys = await prepareE2eeSession(api, currentUser);
         const rawDialogs = await api.readDialogs();
         const nextDialogs = await decryptDialogPreviews(
           rawDialogs,
@@ -334,6 +368,7 @@ export function App() {
       } catch (caughtError) {
         if (!isCancelled) {
           setStartupError(caughtError.message);
+          setAuthError(caughtError.message);
           clearSession();
           navigate("/login");
         }
@@ -424,6 +459,7 @@ export function App() {
     return (
       <LoginPage
         notice={authNotice}
+        sessionError={authError}
         onLogin={handleLogin}
         navigate={navigate}
       />
