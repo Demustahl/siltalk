@@ -1,8 +1,10 @@
 import asyncio
 import uuid
 from collections.abc import Generator
+from datetime import datetime, timezone
 
 import httpx
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -181,6 +183,43 @@ def test_read_dialogs_returns_only_current_user_dialogs() -> None:
             assert response_data[0]["unread_count"] == 0
             assert response_data[0]["last_message"]["sender_username"] == "user1"
             assert response_data[0]["last_message"]["ciphertext"] == "ciphertext-hello"
+
+    asyncio.run(run_test())
+
+
+def test_group_messages_use_save_time_for_ordering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def as_utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+
+        return value
+
+    async def run_test() -> None:
+        async with DialogsTestClient() as test_app:
+            user1 = test_app.create_user("user1")
+            user2 = test_app.create_user("user2")
+            dialog = test_app.create_group_dialog([user1, user2])
+            first_time = datetime(2026, 6, 5, 8, 0, 0, tzinfo=timezone.utc)
+            second_time = datetime(2026, 6, 5, 8, 5, 0, tzinfo=timezone.utc)
+            save_times = iter([first_time, second_time])
+
+            monkeypatch.setattr("app.messages.utc_now", lambda: next(save_times))
+
+            first_message = test_app.save_group_message(
+                user1,
+                dialog.id,
+                "ciphertext-first",
+            )
+            second_message = test_app.save_group_message(
+                user2,
+                dialog.id,
+                "ciphertext-second",
+            )
+
+            assert as_utc(first_message.created_at) == first_time
+            assert as_utc(second_message.created_at) == second_time
 
     asyncio.run(run_test())
 

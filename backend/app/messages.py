@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -22,6 +23,10 @@ MESSAGE_STATUS_ORDER = {
     MESSAGE_STATUS_READ: 3,
 }
 MAX_MESSAGE_ATTACHMENTS = 5
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 # Ищет прямой диалог двух пользователей
@@ -58,7 +63,7 @@ def get_or_create_direct_dialog(
     if existing_dialog is not None:
         return existing_dialog
 
-    dialog = Dialog(dialog_type="direct")
+    dialog = Dialog(dialog_type="direct", created_at=utc_now())
     db_session.add(dialog)
     db_session.flush()
 
@@ -181,6 +186,7 @@ def create_message_in_dialog(
         dialog_id=dialog.id,
         sender_user_id=sender.id,
         ciphertext=ciphertext,
+        created_at=utc_now(),
     )
     db_session.add(message)
     db_session.flush()
