@@ -486,7 +486,6 @@ export function App() {
       {route.name === "settings" ? (
         <SettingsPage
           me={me}
-          e2ee={e2ee}
           onUpdateProfile={updateProfile}
           navigate={navigate}
         />

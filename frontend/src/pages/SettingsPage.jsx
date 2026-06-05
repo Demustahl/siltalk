@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   Check,
   ImagePlus,
-  KeyRound,
   Save,
   ShieldCheck,
   UserRound,
@@ -80,7 +79,7 @@ async function fileToAvatarDataUrl(file) {
   throw new Error("Картинку не удалось достаточно сжать, выберите другой файл");
 }
 
-export function SettingsPage({ me, e2ee, onUpdateProfile, navigate }) {
+export function SettingsPage({ me, onUpdateProfile, navigate }) {
   const [displayName, setDisplayName] = useState(me.display_name || "");
   const [avatarId, setAvatarId] = useState(me.avatar_id || "");
   const [avatarDataUrl, setAvatarDataUrl] = useState(me.avatar_data_url || "");
@@ -194,6 +193,24 @@ export function SettingsPage({ me, e2ee, onUpdateProfile, navigate }) {
               onChange={(event) => setDisplayName(event.target.value)}
             />
           </label>
+
+          <div className="settings-actions profile-settings-actions">
+            <span className="settings-action-status">
+              {statusText ? <span className="status-line success">{statusText}</span> : null}
+              {error ? <span className="status-line error">{error}</span> : null}
+            </span>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => navigate("/dialogs")}
+            >
+              Отмена
+            </button>
+            <button type="submit" disabled={isSaving || isProcessingImage}>
+              <Save size={18} aria-hidden="true" />
+              {isSaving ? "Сохраняю" : "Сохранить"}
+            </button>
+          </div>
         </section>
 
         <section className="settings-card">
@@ -263,51 +280,6 @@ export function SettingsPage({ me, e2ee, onUpdateProfile, navigate }) {
             </button>
           </div>
         </section>
-
-        <section className="settings-card">
-          <div className="settings-card-heading">
-            <span className="settings-icon">
-              <KeyRound size={20} aria-hidden="true" />
-            </span>
-            <div>
-              <h3>Шифрование</h3>
-              <p>Приватный ключ остается в браузере и не уходит на backend.</p>
-            </div>
-          </div>
-
-          <dl className="settings-facts">
-            <div>
-              <dt>Публичный ключ</dt>
-              <dd>{e2ee?.publicKey ? "Опубликован" : "Не готов"}</dd>
-            </div>
-            <div>
-              <dt>Приватный ключ</dt>
-              <dd>Хранится локально</dd>
-            </div>
-            <div>
-              <dt>Сообщения</dt>
-              <dd>В БД сохраняется только ciphertext</dd>
-            </div>
-          </dl>
-        </section>
-
-        <div className="settings-actions">
-          <span className="settings-action-status">
-            {statusText ? <span className="status-line success">{statusText}</span> : null}
-            {error ? <span className="status-line error">{error}</span> : null}
-          </span>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => navigate("/dialogs")}
-          >
-            Отмена
-          </button>
-          <button type="submit" disabled={isSaving || isProcessingImage}>
-            <Save size={18} aria-hidden="true" />
-            {isSaving ? "Сохраняю" : "Сохранить"}
-          </button>
-        </div>
       </form>
     </div>
   );
