@@ -1236,6 +1236,16 @@ h2 {
   margin-bottom: 2px;
 }
 
+.message-line.compact {
+  margin-top: -2px;
+}
+
+.message-avatar-spacer {
+  width: 34px;
+  height: 1px;
+  flex: 0 0 auto;
+}
+
 .message {
   width: fit-content;
   max-width: 100%;

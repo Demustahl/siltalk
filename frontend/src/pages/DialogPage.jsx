@@ -55,6 +55,23 @@ function shouldShowMessageFooter(message, nextMessage) {
   return nextMessageTime - messageTime > MESSAGE_GROUP_GAP_MS;
 }
 
+function shouldShowMessageHeader(message, previousMessage) {
+  if (!previousMessage) {
+    return true;
+  }
+  if (message.sender_username !== previousMessage.sender_username) {
+    return true;
+  }
+  if (getDateKey(message.created_at) !== getDateKey(previousMessage.created_at)) {
+    return true;
+  }
+
+  const messageTime = new Date(message.created_at).getTime();
+  const previousMessageTime = new Date(previousMessage.created_at).getTime();
+
+  return messageTime - previousMessageTime > MESSAGE_GROUP_GAP_MS;
+}
+
 function getMessageSenderProfile(dialog, message, currentUser) {
   if (message.sender_username === currentUser.username) {
     return currentUser;
@@ -338,6 +355,7 @@ export function DialogPage({
           const isOwn = message.sender_username === me.username;
           const showDateDivider = shouldShowDateDivider(message, previousMessage);
           const showFooter = shouldShowMessageFooter(message, nextMessage);
+          const showHeader = shouldShowMessageHeader(message, previousMessage);
           const senderProfile = getMessageSenderProfile(dialog, message, me);
           const senderName = getUserDisplayName(senderProfile);
 
@@ -349,18 +367,26 @@ export function DialogPage({
                 </div>
               ) : null}
 
-              <div className={`message-line${isOwn ? " own" : ""}`}>
+              <div
+                className={`message-line${isOwn ? " own" : ""}${
+                  !showHeader && !isOwn ? " compact" : ""
+                }`}
+              >
                 {!isOwn ? (
-                  <Avatar
-                    username={senderName || message.sender_username}
-                    size="tiny"
-                    avatarId={senderProfile.avatar_id}
-                    avatarDataUrl={senderProfile.avatar_data_url}
-                  />
+                  showHeader ? (
+                    <Avatar
+                      username={senderName || message.sender_username}
+                      size="tiny"
+                      avatarId={senderProfile.avatar_id}
+                      avatarDataUrl={senderProfile.avatar_data_url}
+                    />
+                  ) : (
+                    <span className="message-avatar-spacer" aria-hidden="true" />
+                  )
                 ) : null}
 
                 <article className={`message${isOwn ? " own" : ""}`}>
-                  {isGroup && !isOwn ? (
+                  {isGroup && !isOwn && showHeader ? (
                     <p className="message-sender">{senderName}</p>
                   ) : null}
                   {message.text ? (
