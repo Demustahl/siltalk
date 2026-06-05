@@ -20,6 +20,14 @@ export function getDialogReceiverProfile(dialog, currentUsername) {
   );
 }
 
+function getDialogMemberProfile(dialog, username) {
+  return (
+    (dialog.member_profiles || []).find(
+      (member) => member.username === username,
+    ) || null
+  );
+}
+
 export function getUserDisplayName(user) {
   return user?.display_name || user?.username || "";
 }
@@ -81,7 +89,10 @@ export function getDialogPreview(dialog, currentUsername) {
     return `Вы: ${content}`;
   }
   if (isGroupDialog(dialog)) {
-    return `${lastMessage.sender_username}: ${content}`;
+    const senderProfile = getDialogMemberProfile(dialog, lastMessage.sender_username);
+    const senderName = getUserDisplayName(senderProfile) || lastMessage.sender_username;
+
+    return `${senderName}: ${content}`;
   }
 
   return content;

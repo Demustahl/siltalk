@@ -1220,9 +1220,25 @@ h2 {
   flex-direction: column;
 }
 
+.message-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: min(680px, 84%);
+}
+
+.message-line.own {
+  align-self: flex-end;
+  justify-content: flex-end;
+}
+
+.message-line .avatar {
+  margin-bottom: 2px;
+}
+
 .message {
   width: fit-content;
-  max-width: min(560px, 78%);
+  max-width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 20px;
   padding: 12px 15px;
@@ -1231,7 +1247,6 @@ h2 {
 }
 
 .message.own {
-  align-self: flex-end;
   border-color: rgba(31, 201, 212, 0.18);
   background: linear-gradient(135deg, var(--message-out), var(--message-out-strong));
 }
@@ -1473,7 +1488,7 @@ h2 {
     gap: 10px;
   }
 
-  .message {
+  .message-line {
     max-width: 84%;
   }
 

@@ -23,6 +23,7 @@ import {
   getDialogReceiver,
   getDialogReceiverProfile,
   getDialogSubtitle,
+  getUserDisplayName,
   isGroupDialog,
   messageStatusLabel,
 } from "../lib/format.js";
@@ -52,6 +53,20 @@ function shouldShowMessageFooter(message, nextMessage) {
   const nextMessageTime = new Date(nextMessage.created_at).getTime();
 
   return nextMessageTime - messageTime > MESSAGE_GROUP_GAP_MS;
+}
+
+function getMessageSenderProfile(dialog, message, currentUser) {
+  if (message.sender_username === currentUser.username) {
+    return currentUser;
+  }
+
+  return (
+    (dialog.member_profiles || []).find(
+      (member) => member.username === message.sender_username,
+    ) || {
+      username: message.sender_username,
+    }
+  );
 }
 
 export function DialogPage({
@@ -323,6 +338,8 @@ export function DialogPage({
           const isOwn = message.sender_username === me.username;
           const showDateDivider = shouldShowDateDivider(message, previousMessage);
           const showFooter = shouldShowMessageFooter(message, nextMessage);
+          const senderProfile = getMessageSenderProfile(dialog, message, me);
+          const senderName = getUserDisplayName(senderProfile);
 
           return (
             <div className="message-row" key={message.id}>
@@ -332,40 +349,51 @@ export function DialogPage({
                 </div>
               ) : null}
 
-              <article className={`message${isOwn ? " own" : ""}`}>
-                {isGroup && !isOwn ? (
-                  <p className="message-sender">{message.sender_username}</p>
+              <div className={`message-line${isOwn ? " own" : ""}`}>
+                {!isOwn ? (
+                  <Avatar
+                    username={senderName || message.sender_username}
+                    size="tiny"
+                    avatarId={senderProfile.avatar_id}
+                    avatarDataUrl={senderProfile.avatar_data_url}
+                  />
                 ) : null}
-                {message.text ? (
-                  <p className="message-text">{message.text}</p>
-                ) : null}
-                {message.attachments?.length > 0 ? (
-                  <div className="message-attachments">
-                    {message.attachments.map((attachment) => (
-                      <button
-                        className="attachment-chip"
-                        key={attachment.id}
-                        type="button"
-                        onClick={() => handleDownloadAttachment(attachment)}
-                      >
-                        <Download size={16} aria-hidden="true" />
-                        <span>
-                          <strong>{attachment.name || "Файл"}</strong>
-                          <small>{formatFileSize(attachment.size)}</small>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {showFooter ? (
-                  <p className="message-footer">
-                    <span>{formatMessageTime(message.created_at)}</span>
-                    {isOwn ? (
-                      <span>{messageStatusLabel(message.status)}</span>
-                    ) : null}
-                  </p>
-                ) : null}
-              </article>
+
+                <article className={`message${isOwn ? " own" : ""}`}>
+                  {isGroup && !isOwn ? (
+                    <p className="message-sender">{senderName}</p>
+                  ) : null}
+                  {message.text ? (
+                    <p className="message-text">{message.text}</p>
+                  ) : null}
+                  {message.attachments?.length > 0 ? (
+                    <div className="message-attachments">
+                      {message.attachments.map((attachment) => (
+                        <button
+                          className="attachment-chip"
+                          key={attachment.id}
+                          type="button"
+                          onClick={() => handleDownloadAttachment(attachment)}
+                        >
+                          <Download size={16} aria-hidden="true" />
+                          <span>
+                            <strong>{attachment.name || "Файл"}</strong>
+                            <small>{formatFileSize(attachment.size)}</small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {showFooter ? (
+                    <p className="message-footer">
+                      <span>{formatMessageTime(message.created_at)}</span>
+                      {isOwn ? (
+                        <span>{messageStatusLabel(message.status)}</span>
+                      ) : null}
+                    </p>
+                  ) : null}
+                </article>
+              </div>
             </div>
           );
         })}
