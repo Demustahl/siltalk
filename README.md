@@ -40,7 +40,6 @@ SilTalk — мессенджер с E2EE (end-to-end encryption).
 
 - `backend/` — backend на Python и FastAPI
 - `frontend/` — React-клиент
-- `infra/` — инфраструктурные файлы и локальный запуск
 
 ## Локальная база данных
 
